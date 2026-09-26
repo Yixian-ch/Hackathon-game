@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rhythm Runner — style options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Barlow:wght@500;700&family=Permanent+Marker&family=Anton&family=Space+Grotesk:wght@500;700&family=Rock+Salt&family=Archivo+Black&family=Big+Shoulders:wght@900&family=Space+Mono:wght@400;700&family=Public+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- page chrome ---------- */
+  :root { --page-bg: #141416; --page-fg: #ECE9E1; --page-dim: #9a978f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page-bg); color: var(--page-fg); font-family: "Space Grotesk", system-ui, sans-serif; }
+  header { padding: 18px 24px 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 22px; }
+  header h1 { margin: 0; font: 700 20px/1.2 "Space Grotesk", sans-serif; letter-spacing: -0.5px; }
+  header p { margin: 0; color: var(--page-dim); font-size: 14px; }
+  header .toggle { margin-left: auto; display: flex; gap: 8px; }
+  .toggle button { font: 700 13px "Space Grotesk", sans-serif; letter-spacing: 1px; text-transform: uppercase; padding: 8px 14px; border: 2px solid var(--page-fg); background: transparent; color: var(--page-fg); cursor: pointer; }
+  .toggle button.on { background: var(--page-fg); color: var(--page-bg); }
+  #grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 8px 24px 40px; }
+  #grid.full { grid-template-columns: 1fr; }
+  .option { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .summary { border: 2px solid #2a2a2e; padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; line-height: 1.5; }
+  .summary b { color: var(--page-dim); font-weight: 700; letter-spacing: 1px; font-size: 11px; text-transform: uppercase; }
+  .summary .name { grid-column: 1 / -1; font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .summary .name small { color: var(--page-dim); font-weight: 500; font-size: 12px; margin-left: 8px; letter-spacing: 0; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sw { display: inline-flex; align-items: center; gap: 5px; font: 12px "Space Mono", monospace; }
+  .sw i { width: 16px; height: 16px; display: inline-block; border: 1px solid rgba(255,255,255,0.2); }
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 2px solid #2a2a2e; background: #000; }
+  .frame { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; user-select: none; }
+
+  /* ---------- shared mockup structure (positions mirror index.html's song select) ---------- */
+  .frame .layer { position: absolute; inset: 0; pointer-events: none; }
+  .frame .title { position: absolute; left: 50%; top: 30px; transform: translateX(-50%) rotate(-3deg); font-size: 58px; line-height: 1; padding: 10px 34px 8px; white-space: nowrap; }
+  .frame .carousel { position: absolute; left: 0; right: 0; top: 150px; height: 400px; }
+  .record { position: absolute; border-radius: 50%; top: 50%; }
+  .record::before { content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 0 2px, rgba(0,0,0,0) 2px 7px); }
+  .record .lbl { position: absolute; left: 50%; top: 50%; width: 36%; height: 36%; border-radius: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; text-align: center; }
+  .record .lbl::after { content: ""; position: absolute; width: 9%; height: 9%; border-radius: 50%; background: #0c0c0e; }
+  .record.center { left: 50%; width: 360px; height: 360px; transform: translate(-50%, -50%); }
+  .record.side { width: 220px; height: 220px; transform: translateY(-50%); opacity: 0.85; }
+  .record.side.l { left: 240px; } .record.side.r { right: 240px; }
+  .record.side .lbl span { display: block; font-size: 12px; }
+  .sleeve { position: absolute; top: 50%; width: 180px; height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 6px; }
+  .sleeve.upload { left: 40px; transform: translateY(-50%) rotate(-3deg); }
+  .sleeve.generate { right: 40px; transform: translateY(-50%) rotate(3deg); }
+  .sleeve .big { font-size: 24px; line-height: 1.05; }
+  .sleeve .small { font-size: 11px; letter-spacing: 1px; opacity: 0.85; }
+  .sleeve svg { width: 34px; height: 34px; }
+  .tonearm { position: absolute; left: 50%; top: 50%; width: 250px; height: 14px; transform-origin: 100% 50%; transform: translate(-10px, -150px) rotate(-32deg); }
+  .tonearm::before { content: ""; position: absolute; right: -14px; top: -10px; width: 34px; height: 34px; border-radius: 50%; }
+  .tonearm::after { content: ""; position: absolute; left: -6px; top: -6px; width: 36px; height: 26px; }
+  .songcard { position: absolute; left: 50%; top: 548px; z-index: 2; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; padding: 10px 18px; white-space: nowrap; }
+  .songcard .t { font-size: 28px; line-height: 1; }
+  .songcard .a { font-size: 13px; letter-spacing: 2px; opacity: 0.8; }
+  .diffs { display: flex; gap: 8px; }
+  .diff { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1; padding: 8px 11px; letter-spacing: 1px; min-height: 32px; }
+  .diff b { font-size: 15px; }
+  .onboard { position: absolute; left: 34px; bottom: 34px; max-width: 250px; padding: 10px 14px; font-size: 15px; line-height: 1.5; letter-spacing: 1px; }
+  .bosses { position: absolute; right: 34px; bottom: 34px; min-width: 150px; min-height: 48px; display: flex; align-items: center; justify-content: center; font-size: 19px; letter-spacing: 3px; }
+  .keys { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 13px; letter-spacing: 1px; opacity: 0.85; display: flex; gap: 14px; align-items: center; }
+  .keys kbd { font: inherit; padding: 3px 8px; }
+  .sticker { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1; pointer-events: none; }
+  .star { position: absolute; }
+
+  /* ================================================================
+     OPTION A — STICKER BOMB  (Gen Z Chaos / Maximalism, saturation pulled down)
+     ================================================================ */
+  .a { --bg: #1F1D1B; --bg2: #2A2725; --paper: #F3EDE0; --ink: #121110; --red: #D9543F; --mustard: #E3B341; --cobalt: #3A63B0; --mint: #4FA38C; --plum: #8C4B7A;
+       --display: "Bangers", Impact, sans-serif; --hand: "Permanent Marker", cursive; --body: "Barlow", sans-serif;
+       background: var(--bg); color: var(--paper); font-family: var(--body); }
+  .a .halftone { background-image: radial-gradient(circle, rgba(243,237,224,0.16) 1.6px, transparent 1.9px); background-size: 12px 12px;
+                 -webkit-mask-image: radial-gradient(ellipse at 20% 100%, #000 10%, transparent 60%), radial-gradient(ellipse at 90% 0%, #000 5%, transparent 55%); mask-image: radial-gradient(ellipse at 20% 100%, #000 10%, transparent 60%), radial-gradient(ellipse at 90% 0%, #000 5%, transparent 55%); }
+  .a .stripe { background: repeating-linear-gradient(-35deg, transparent 0 34px, rgba(227,179,65,0.08) 34px 52px); }
+  .a .sticker { font-family: var(--display); color: var(--ink); box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper); }
+  .a .stk1 { left: 140px; top: 84px; width: 120px; height: 120px; border-radius: 50%; background: var(--red); transform: rotate(-12deg); font-size: 22px; color: var(--paper); }
+  .a .stk2 { right: 210px; top: 60px; width: 150px; height: 56px; background: var(--mustard); transform: rotate(8deg); font-size: 26px; border-radius: 8px; }
+  .a .stk3 { left: 258px; bottom: 138px; width: 96px; height: 96px; background: var(--cobalt); color: var(--paper); transform: rotate(14deg); font-size: 18px; clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 60%, 80% 100%, 50% 78%, 20% 100%, 30% 60%, 0 38%, 38% 35%); box-shadow: none; }
+  .a .stk4 { right: 250px; bottom: 150px; width: 130px; height: 44px; background: var(--paper); transform: rotate(-7deg); font-family: var(--hand); font-size: 16px; border-radius: 4px; }
+  .a .stk5 { left: 470px; top: 96px; width: 74px; height: 74px; border-radius: 50%; background: var(--mint); transform: rotate(20deg); font-size: 12px; font-family: var(--body); font-weight: 700; letter-spacing: 1px; }
+  .a .title { font-family: var(--display); color: var(--ink); background: var(--paper); border-radius: 16px; letter-spacing: 2px;
+              box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper); text-shadow: -3px 0 var(--red), 3px 0 var(--cobalt); }
+  .a .title::after { content: ""; position: absolute; right: -2px; top: -2px; border-style: solid; border-width: 0 26px 26px 0; border-color: transparent var(--bg) transparent transparent; }
+  .a .record { background: radial-gradient(circle, #2b2a28 0 34%, #151413 35% 100%); box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--paper), 12px 14px 0 rgba(0,0,0,0.35); }
+  .a .record.center .lbl { background: var(--mustard); font-family: var(--display); font-size: 30px; color: var(--ink); letter-spacing: 1px; }
+  .a .record.side.l .lbl { background: var(--red); font-family: var(--display); color: var(--paper); }
+  .a .record.side.r .lbl { background: var(--cobalt); font-family: var(--display); color: var(--paper); }
+  .a .record .lbl { border: 3px solid var(--ink); }
+  .a .sleeve { border-radius: 14px; box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper), 10px 12px 0 rgba(0,0,0,0.35); font-family: var(--display); letter-spacing: 1px; }
+  .a .sleeve.upload { background: var(--paper); color: var(--ink); }
+  .a .sleeve.upload .big { color: var(--red); text-shadow: 2px 2px 0 var(--ink); }
+  .a .sleeve.generate { background: var(--plum); color: var(--paper); }
+  .a .sleeve.generate .big { color: var(--mustard); text-shadow: 2px 2px 0 var(--ink); }
+  .a .sleeve .small { font-family: var(--body); font-weight: 700; }
+  .a .sleeve svg { fill: currentColor; }
+  .a .tonearm { background: var(--paper); border: 3px solid var(--ink); border-radius: 8px; }
+  .a .tonearm::before { background: var(--mint); border: 3px solid var(--ink); }
+  .a .tonearm::after { background: var(--red); border: 3px solid var(--ink); border-radius: 6px; }
+  .a .songcard { background: var(--paper); color: var(--ink); border-radius: 14px; transform: translateX(-50%) rotate(1.5deg); box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper); }
+  .a .songcard .t { font-family: var(--display); letter-spacing: 1px; }
+  .a .songcard .a { font-weight: 700; }
+  .a .diff { border-radius: 999px; font-family: var(--display); font-size: 14px; color: var(--ink); box-shadow: 0 0 0 2px var(--ink); transform: skewX(-6deg); }
+  .a .diff.e { background: var(--mint); } .a .diff.n { background: var(--mustard); } .a .diff.h { background: var(--red); color: var(--paper); } .a .diff.x { background: var(--cobalt); color: var(--paper); transform: skewX(-6deg) rotate(-4deg) scale(1.08); box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper); }
+  .a .onboard { background: var(--paper); color: var(--ink); font-family: var(--hand); font-size: 14px; letter-spacing: 0; border-radius: 12px; transform: rotate(-3deg); box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper); }
+  .a .bosses { background: var(--red); color: var(--paper); font-family: var(--display); border-radius: 999px; transform: rotate(3deg); box-shadow: 0 0 0 3px var(--ink), 0 0 0 6px var(--paper); }
+  .a .keys { font-weight: 700; color: var(--paper); }
+  .a .keys kbd { background: var(--paper); color: var(--ink); border-radius: 6px; box-shadow: 0 2px 0 2px var(--ink); }
+
+  /* ================================================================
+     OPTION B — XEROX ZINE  (Anti-Polish / Raw, riso ink on newsprint)
+     ================================================================ */
+  .b { --bg: #E8E1CF; --paper: #F6F1E4; --kraft: #C9A978; --ink: #17140F; --riso-red: #D0392E; --riso-blue: #2D5BA8; --riso-green: #2F8A66; --riso-yellow: #E5BE3C;
+       --display: "Anton", Impact, sans-serif; --hand: "Rock Salt", cursive; --body: "Space Grotesk", sans-serif;
+       background: var(--bg); color: var(--ink); font-family: var(--body); }
+  .b .grain { opacity: 0.22; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>"); }
+  .b .streak { background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(23,20,15,0.05) 3px 4px), linear-gradient(90deg, rgba(23,20,15,0.16), transparent 12%, transparent 88%, rgba(23,20,15,0.18)); }
+  .b .cut { position: absolute; background: var(--paper); box-shadow: 3px 3px 0 rgba(23,20,15,0.25); }
+  .b .cut1 { left: 96px; top: 70px; width: 210px; height: 120px; transform: rotate(-6deg); background: var(--riso-blue); mix-blend-mode: multiply; opacity: 0.9;
+             background-image: radial-gradient(circle, rgba(246,241,228,0.55) 1.5px, transparent 1.9px); background-size: 7px 7px; }
+  .b .cut2 { right: 130px; top: 84px; width: 150px; height: 150px; transform: rotate(9deg); background: var(--riso-red); mix-blend-mode: multiply; border-radius: 50%; opacity: 0.85; }
+  .b .cut3 { left: 236px; bottom: 120px; width: 260px; height: 60px; transform: rotate(4deg); background: var(--riso-green); mix-blend-mode: multiply; opacity: 0.8; }
+  .b .cut4 { right: 236px; bottom: 148px; width: 120px; height: 120px; transform: rotate(-11deg); background: var(--riso-yellow); mix-blend-mode: multiply; opacity: 0.85; }
+  .b .tape { position: absolute; height: 28px; background: rgba(229,190,60,0.45); border-left: 2px dashed rgba(23,20,15,0.25); border-right: 2px dashed rgba(23,20,15,0.25); }
+  .b .sticker { font-family: var(--hand); font-size: 14px; color: var(--ink); }
+  .b .stk1 { left: 128px; top: 210px; width: 170px; transform: rotate(-5deg); }
+  .b .stk2 { right: 300px; top: 112px; width: 180px; transform: rotate(6deg); font-family: var(--body); font-weight: 700; font-size: 12px; letter-spacing: 3px; }
+  .b .title { font-family: var(--display); color: var(--ink); background: var(--paper); letter-spacing: 3px; padding: 6px 30px 4px; transform: translateX(-50%) rotate(-2deg);
+              box-shadow: 4px 4px 0 var(--ink); text-shadow: 4px 3px 0 var(--riso-red); }
+  .b .title::before { content: ""; position: absolute; left: 30%; top: -12px; width: 110px; height: 24px; background: rgba(229,190,60,0.5); transform: rotate(-8deg); }
+  .b .record { background: radial-gradient(circle, #24211c 0 34%, #17140F 35% 100%); border: 3px solid var(--ink); box-shadow: 8px 8px 0 rgba(23,20,15,0.22); }
+  .b .record::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background-image: radial-gradient(circle, rgba(246,241,228,0.12) 1px, transparent 1.4px); background-size: 6px 6px; }
+  .b .record .lbl { border: 2px solid var(--ink); font-family: var(--display); }
+  .b .record.center .lbl { background: var(--riso-red); color: var(--paper); font-size: 26px; letter-spacing: 2px; }
+  .b .record.side.l .lbl { background: var(--riso-blue); color: var(--paper); }
+  .b .record.side.r .lbl { background: var(--riso-green); color: var(--paper); }
+  .b .sleeve { border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); font-family: var(--display); letter-spacing: 1px; }
+  .b .sleeve.upload { background: var(--kraft); color: var(--ink); transform: translateY(-50%) rotate(-4deg); }
+  .b .sleeve.generate { background: var(--riso-blue); color: var(--paper); transform: translateY(-50%) rotate(3deg); }
+  .b .sleeve .big { font-size: 26px; }
+  .b .sleeve .small { font-family: var(--body); font-weight: 700; letter-spacing: 2px; }
+  .b .sleeve svg { fill: none; stroke: currentColor; stroke-width: 2.5; }
+  .b .sleeve.upload::after { content: ""; position: absolute; left: 50%; top: -14px; width: 90px; height: 24px; background: rgba(229,190,60,0.55); transform: translateX(-50%) rotate(-3deg); }
+  .b .tonearm { background: var(--paper); border: 3px solid var(--ink); }
+  .b .tonearm::before { background: var(--riso-yellow); border: 3px solid var(--ink); }
+  .b .tonearm::after { background: var(--ink); }
+  .b .songcard { background: var(--paper); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); transform: translateX(-50%) rotate(-1deg); }
+  .b .songcard .t { font-family: var(--display); letter-spacing: 2px; }
+  .b .songcard .a { font-weight: 700; }
+  .b .diff { font-family: var(--body); font-weight: 700; font-size: 12px; border: 2px dashed var(--ink); background: var(--paper); text-transform: uppercase; }
+  .b .diff.e { color: var(--riso-green); border-color: var(--riso-green); } .b .diff.n { color: var(--riso-blue); border-color: var(--riso-blue); }
+  .b .diff.h { color: var(--riso-red); border-color: var(--riso-red); } .b .diff.x { background: var(--ink); color: var(--riso-yellow); border: 2px solid var(--ink); transform: rotate(-3deg); }
+  .b .onboard { background: var(--paper); color: var(--ink); font-family: var(--hand); font-size: 12px; line-height: 1.9; letter-spacing: 0; border: 2px solid var(--ink); transform: rotate(-2deg); box-shadow: 4px 4px 0 var(--ink); }
+  .b .bosses { background: transparent; color: var(--riso-red); font-family: var(--display); font-size: 24px; border: 4px double var(--riso-red); transform: rotate(-4deg); letter-spacing: 4px; padding: 0 14px;
+               -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2 -0.3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>"); mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2 -0.3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>"); }
+  .b .keys { font-weight: 700; color: var(--ink); }
+  .b .keys kbd { border: 2px solid var(--ink); background: var(--paper); }
+
+  /* ================================================================
+     OPTION C — CONCRETE BRUTAL  (Brutalism, skatepark signage)
+     ================================================================ */
+  .c { --bg: #CFCDC5; --bg2: #B9B7AE; --paper: #F2F1EC; --ink: #111111; --orange: #E8641B; --blue: #1F3F8F; --yellow: #F0C232; --green: #2F7D5B;
+       --display: "Archivo Black", Impact, sans-serif; --display2: "Big Shoulders", Impact, sans-serif; --mono: "Space Mono", monospace; --body: "Public Sans", sans-serif;
+       background: var(--bg); color: var(--ink); font-family: var(--body); }
+  .c .grain { opacity: 0.35; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>"); }
+  .c .gridlines { background-image: linear-gradient(rgba(17,17,17,0.10) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.10) 1px, transparent 1px); background-size: 80px 80px; }
+  .c .hazard { position: absolute; left: 0; right: 0; height: 22px; background: repeating-linear-gradient(-45deg, var(--yellow) 0 22px, var(--ink) 22px 44px); border-top: 3px solid var(--ink); border-bottom: 3px solid var(--ink); }
+  .c .hazard.top { top: 0; border-top: 0; } .c .hazard.bottom { bottom: 0; border-bottom: 0; }
+  .c .ghost { position: absolute; left: -10px; bottom: 30px; font-family: var(--display2); font-weight: 900; font-size: 190px; line-height: 0.8; letter-spacing: -4px; color: transparent; -webkit-text-stroke: 2px rgba(17,17,17,0.14); text-transform: uppercase; }
+  .c .block { position: absolute; border: 4px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); }
+  .c .blk1 { left: 110px; top: 78px; width: 150px; height: 44px; background: var(--orange); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 3px; color: var(--paper); }
+  .c .blk2 { right: 140px; top: 72px; width: 120px; height: 120px; background: var(--blue); }
+  .c .blk2::after { content: ""; position: absolute; left: 20px; top: 20px; right: 20px; bottom: 20px; border: 4px solid var(--paper); }
+  .c .blk3 { right: 288px; top: 96px; width: 60px; height: 60px; background: var(--yellow); border-radius: 50%; box-shadow: 6px 6px 0 var(--ink); }
+  .c .title { font-family: var(--display); color: var(--orange); background: var(--ink); letter-spacing: -1px; padding: 12px 30px 10px; transform: translateX(-50%) skewX(-8deg); font-size: 60px; box-shadow: 10px 10px 0 var(--orange); }
+  .c .title span { display: inline-block; transform: skewX(8deg); }
+  .c .record { background: radial-gradient(circle, #222 0 34%, #111 35% 100%); border: 4px solid var(--ink); box-shadow: 10px 10px 0 var(--ink); }
+  .c .record .lbl { font-family: var(--display); border: 4px solid var(--ink); border-radius: 50%; }
+  .c .record.center .lbl { background: var(--orange); color: var(--ink); font-size: 24px; letter-spacing: -0.5px; }
+  .c .record.side.l .lbl { background: var(--blue); color: var(--paper); }
+  .c .record.side.r .lbl { background: var(--yellow); color: var(--ink); }
+  .c .sleeve { border: 4px solid var(--ink); box-shadow: 10px 10px 0 var(--ink); font-family: var(--display); letter-spacing: -0.5px; transform: translateY(-50%); }
+  .c .sleeve.upload { background: var(--paper); color: var(--ink); }
+  .c .sleeve.generate { background: var(--blue); color: var(--paper); }
+  .c .sleeve .big { font-size: 22px; }
+  .c .sleeve .small { font-family: var(--mono); font-weight: 700; letter-spacing: 0; font-size: 11px; }
+  .c .sleeve svg { fill: currentColor; }
+  .c .tonearm { background: var(--paper); border: 4px solid var(--ink); }
+  .c .tonearm::before { background: var(--yellow); border: 4px solid var(--ink); border-radius: 0; }
+  .c .tonearm::after { background: var(--orange); border: 4px solid var(--ink); }
+  .c .songcard { background: var(--paper); border: 4px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); }
+  .c .songcard .t { font-family: var(--display); letter-spacing: -1px; font-size: 26px; }
+  .c .songcard .a { font-family: var(--mono); font-weight: 700; letter-spacing: 1px; }
+  .c .diff { font-family: var(--mono); font-weight: 700; font-size: 12px; border: 3px solid var(--ink); background: var(--paper); color: var(--ink); text-transform: uppercase; }
+  .c .diff.e { background: var(--green); color: var(--paper); } .c .diff.n { background: var(--blue); color: var(--paper); } .c .diff.h { background: var(--orange); }
+  .c .diff.x { background: var(--ink); color: var(--yellow); box-shadow: 4px 4px 0 var(--yellow); }
+  .c .onboard { background: var(--ink); color: var(--paper); font-family: var(--mono); font-weight: 700; font-size: 12px; line-height: 1.8; letter-spacing: 0; box-shadow: 6px 6px 0 var(--orange); bottom: 48px; }
+  .c .bosses { background: var(--yellow); color: var(--ink); font-family: var(--display); border: 4px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); letter-spacing: 1px; bottom: 48px; font-size: 20px; }
+  .c .keys { font-family: var(--mono); font-weight: 700; color: var(--ink); bottom: 40px; }
+  .c .keys kbd { border: 2px solid var(--ink); background: var(--paper); box-shadow: 3px 3px 0 var(--ink); }
+
+  @media (max-width: 1100px) { #grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rhythm Runner — song select, 3 style candidates</h1>
+  <p>Same structure in each (title, vinyl carousel, upload / generate sleeves, difficulty tags, BOSSES). Only the skin changes.</p>
+  <div class="toggle"><button id="side" class="on" type="button">3 across</button><button id="full" type="button">Full size</button></div>
+</header>
+
+<div id="grid">
+
+  <!-- ============================ A ============================ -->
+  <div class="option">
+    <div class="summary">
+      <div class="name">A · STICKER BOMB <small>Gen Z Chaos / Maximalism, saturation pulled down</small></div>
+      <b>Palette</b><div class="swatches"><span class="sw"><i style="background:#1F1D1B"></i>#1F1D1B</span><span class="sw"><i style="background:#F3EDE0"></i>#F3EDE0</span><span class="sw"><i style="background:#D9543F"></i>#D9543F</span><span class="sw"><i style="background:#E3B341"></i>#E3B341</span><span class="sw"><i style="background:#3A63B0"></i>#3A63B0</span><span class="sw"><i style="background:#4FA38C"></i>#4FA38C</span><span class="sw"><i style="background:#8C4B7A"></i>#8C4B7A</span></div>
+      <b>Fonts</b><div>Bangers (display) · Permanent Marker (notes) · Barlow (UI)</div>
+      <b>Mood</b><div>A skate deck plastered with slap stickers: comic-print halftone, thick ink outlines, everything a little crooked.</div>
+    </div>
+    <div class="stage">
+      <section class="frame a">
+        <div class="layer halftone"></div>
+        <div class="layer stripe"></div>
+        <div class="sticker stk1">NO<br>SKIP</div>
+        <div class="sticker stk2">FRESH!</div>
+        <div class="sticker stk3">SSS</div>
+        <div class="sticker stk4">stay loud</div>
+        <div class="sticker stk5">SIDE B</div>
+        <div class="title">RHYTHM RUNNER</div>
+        <div class="carousel">
+          <div class="sleeve upload"><svg viewBox="0 0 24 24"><path d="M12 3l6 6h-4v6h-4V9H6zM4 18h16v3H4z"/></svg><div class="big">+ UPLOAD<br>YOUR SONG</div><div class="small">MP3 · WAV · OGG</div></div>
+          <div class="record side l"><div class="lbl"><span>BELLE U</span></div></div>
+          <div class="record center"><div class="lbl">BOCCI</div></div>
+          <div class="record side r"><div class="lbl"><span>METRO</span></div></div>
+          <div class="sleeve generate"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg><div class="big">GENERATE<br>A SONG</div><div class="small">COMING SOON</div></div>
+          <div class="tonearm"></div>
+        </div>
+        <div class="songcard"><div><div class="t">BOCCI</div><div class="a">BUNDLED · 172 BPM</div></div>
+          <div class="diffs"><span class="diff e">EASY <b>3</b></span><span class="diff n">NORMAL <b>6</b></span><span class="diff h">HARD <b>9</b></span><span class="diff x">EXPERT <b>12</b></span></div></div>
+        <div class="onboard">PICK A RECORD<br>↑↓ HIT THE ENEMIES<br>UPLOAD ANY SONG TO MAKE IT A LEVEL</div>
+        <div class="keys"><kbd>←</kbd><kbd>→</kbd> PICK <kbd>ENTER</kbd> CHOOSE</div>
+        <div class="bosses">BOSSES</div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================ B ============================ -->
+  <div class="option">
+    <div class="summary">
+      <div class="name">B · XEROX ZINE <small>Anti-Polish / Raw, riso ink on newsprint</small></div>
+      <b>Palette</b><div class="swatches"><span class="sw"><i style="background:#E8E1CF"></i>#E8E1CF</span><span class="sw"><i style="background:#C9A978"></i>#C9A978</span><span class="sw"><i style="background:#17140F"></i>#17140F</span><span class="sw"><i style="background:#D0392E"></i>#D0392E</span><span class="sw"><i style="background:#2D5BA8"></i>#2D5BA8</span><span class="sw"><i style="background:#2F8A66"></i>#2F8A66</span><span class="sw"><i style="background:#E5BE3C"></i>#E5BE3C</span></div>
+      <b>Fonts</b><div>Anton (display) · Rock Salt (scribbles) · Space Grotesk (UI)</div>
+      <b>Mood</b><div>A photocopied skate zine: cut-and-paste collage, misregistered riso ink, tape and rubber stamps on kraft paper.</div>
+    </div>
+    <div class="stage">
+      <section class="frame b">
+        <div class="layer streak"></div>
+        <div class="cut cut1"></div>
+        <div class="cut cut2"></div>
+        <div class="cut cut3"></div>
+        <div class="cut cut4"></div>
+        <div class="tape" style="left:60px; top:400px; width:120px; transform: rotate(-30deg)"></div>
+        <div class="tape" style="right:70px; top:470px; width:140px; transform: rotate(25deg)"></div>
+        <div class="sticker stk1">cut here →</div>
+        <div class="sticker stk2">ISSUE #03 · FREE</div>
+        <div class="title">RHYTHM RUNNER</div>
+        <div class="carousel">
+          <div class="sleeve upload"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 9l5-5 5 5M5 19h14"/></svg><div class="big">+ UPLOAD<br>YOUR SONG</div><div class="small">MP3 · WAV · OGG</div></div>
+          <div class="record side l"><div class="lbl"><span>BELLE U</span></div></div>
+          <div class="record center"><div class="lbl">BOCCI</div></div>
+          <div class="record side r"><div class="lbl"><span>METRO</span></div></div>
+          <div class="sleeve generate"><svg viewBox="0 0 24 24"><path d="M12 3l2.2 6.1L20 11l-5.8 1.9L12 19l-2.2-6.1L4 11l5.8-1.9z"/></svg><div class="big">GENERATE<br>A SONG</div><div class="small">COMING SOON</div></div>
+          <div class="tonearm"></div>
+        </div>
+        <div class="songcard"><div><div class="t">BOCCI</div><div class="a">BUNDLED · 172 BPM</div></div>
+          <div class="diffs"><span class="diff e">EASY <b>3</b></span><span class="diff n">NORMAL <b>6</b></span><span class="diff h">HARD <b>9</b></span><span class="diff x">EXPERT <b>12</b></span></div></div>
+        <div class="onboard">PICK A RECORD<br>↑↓ HIT THE ENEMIES<br>UPLOAD ANY SONG TO MAKE IT A LEVEL</div>
+        <div class="keys"><kbd>←</kbd><kbd>→</kbd> PICK <kbd>ENTER</kbd> CHOOSE</div>
+        <div class="bosses">BOSSES</div>
+        <div class="layer grain"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================ C ============================ -->
+  <div class="option">
+    <div class="summary">
+      <div class="name">C · CONCRETE BRUTAL <small>Brutalism, skatepark signage</small></div>
+      <b>Palette</b><div class="swatches"><span class="sw"><i style="background:#CFCDC5"></i>#CFCDC5</span><span class="sw"><i style="background:#F2F1EC"></i>#F2F1EC</span><span class="sw"><i style="background:#111111"></i>#111111</span><span class="sw"><i style="background:#E8641B"></i>#E8641B</span><span class="sw"><i style="background:#1F3F8F"></i>#1F3F8F</span><span class="sw"><i style="background:#F0C232"></i>#F0C232</span><span class="sw"><i style="background:#2F7D5B"></i>#2F7D5B</span></div>
+      <b>Fonts</b><div>Archivo Black + Big Shoulders (display) · Space Mono (labels) · Public Sans (UI)</div>
+      <b>Mood</b><div>Stencilled skatepark concrete: sharp corners, hard offset shadows, hazard tape, safety orange on grey.</div>
+    </div>
+    <div class="stage">
+      <section class="frame c">
+        <div class="layer gridlines"></div>
+        <div class="layer grain"></div>
+        <div class="hazard top"></div>
+        <div class="hazard bottom"></div>
+        <div class="ghost">SKATE</div>
+        <div class="block blk1">NO PARKING</div>
+        <div class="block blk2"></div>
+        <div class="block blk3"></div>
+        <div class="title"><span>RHYTHM RUNNER</span></div>
+        <div class="carousel">
+          <div class="sleeve upload"><svg viewBox="0 0 24 24"><path d="M12 3l6 6h-4v6h-4V9H6zM4 18h16v3H4z"/></svg><div class="big">+ UPLOAD<br>YOUR SONG</div><div class="small">MP3 / WAV / OGG</div></div>
+          <div class="record side l"><div class="lbl"><span>BELLE U</span></div></div>
+          <div class="record center"><div class="lbl">BOCCI</div></div>
+          <div class="record side r"><div class="lbl"><span>METRO</span></div></div>
+          <div class="sleeve generate"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg><div class="big">GENERATE<br>A SONG</div><div class="small">[COMING SOON]</div></div>
+          <div class="tonearm"></div>
+        </div>
+        <div class="songcard"><div><div class="t">BOCCI</div><div class="a">BUNDLED / 172 BPM</div></div>
+          <div class="diffs"><span class="diff e">EASY <b>3</b></span><span class="diff n">NORMAL <b>6</b></span><span class="diff h">HARD <b>9</b></span><span class="diff x">EXPERT <b>12</b></span></div></div>
+        <div class="onboard">&gt; PICK A RECORD<br>&gt; ↑↓ HIT THE ENEMIES<br>&gt; UPLOAD ANY SONG TO MAKE IT A LEVEL</div>
+        <div class="keys"><kbd>←</kbd><kbd>→</kbd> PICK <kbd>ENTER</kbd> CHOOSE</div>
+        <div class="bosses">BOSSES</div>
+      </section>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Static mockups: the only script scales each 1280x720 frame to its column.
+  const grid = document.getElementById('grid');
+  function fit() {
+    for (const stage of document.querySelectorAll('.stage')) {
+      const s = stage.clientWidth / 1280;
+      stage.querySelector('.frame').style.transform = 'scale(' + s + ')';
+    }
+  }
+  document.getElementById('side').onclick = e => { grid.classList.remove('full'); e.target.classList.add('on'); document.getElementById('full').classList.remove('on'); fit(); };
+  document.getElementById('full').onclick = e => { grid.classList.add('full'); e.target.classList.add('on'); document.getElementById('side').classList.remove('on'); fit(); };
+  if (location.hash === '#full') document.getElementById('full').click();
+  addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

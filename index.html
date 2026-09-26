@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rhythm Runner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +14,8 @@
           --dim: #6B6355; --dimpaper: #B8AE98;
           --display: "Anton", Impact, "Arial Black", sans-serif; --hand: "Rock Salt", "Segoe Print", "Marker Felt", cursive; --body: "Space Grotesk", system-ui, sans-serif; }
   html, body { margin: 0; height: 100%; background: #1c1a16; color: var(--paper); font-family: var(--body); overflow: hidden; }
-  #wrap { position: relative; width: 1280px; height: 720px; margin: 0 auto; }
+  /* The 1280x720 stage is scaled to fit the window (letterboxed, aspect kept). Hit-testing reads the canvas's on-screen size, so it stays exact. */
+  #wrap { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; margin: 0; transform: translate(-50%, -50%) scale(var(--stage-scale, 1)); transform-origin: center; }
   canvas { display: block; }
   #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(23, 20, 15, 0.6); }
   #overlay.results, #overlay.select { background: transparent; }   /* results + song select are drawn on the canvas */
@@ -1978,6 +1980,11 @@ function render(st, vt, bpm, dt) {
   }
   g.globalAlpha = STYLE.grainAlpha; g.fillStyle = GRAIN; g.fillRect(0, 0, W, H); g.globalAlpha = 1;   // print grain over everything
 }
+
+// Fit the stage to the window: same scale on both axes, black bars on the rest.
+const wrapEl = document.getElementById('wrap');
+function fitStage() { wrapEl.style.setProperty('--stage-scale', Math.min(innerWidth / W, innerHeight / H)); }
+addEventListener('resize', fitStage); addEventListener('orientationchange', fitStage); fitStage();
 
 let lastTs = performance.now();
 function frame(ts) {

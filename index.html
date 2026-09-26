@@ -1,0 +1,2379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rhythm Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rock+Salt&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* "Xerox zine" skin. Palette mirrors PALETTE in the script: newsprint #E8E1CF, paper #F6F1E4, kraft #C9A978, ink #17140F,
+     riso red #D0392E, riso blue #2D5BA8, riso green #2F8A66, riso yellow #E5BE3C, riso pink #C94F86 */
+  :root { --news: #E8E1CF; --paper: #F6F1E4; --kraft: #C9A978; --ink: #17140F; --red: #D0392E; --blue: #2D5BA8; --green: #2F8A66; --yellow: #E5BE3C; --pink: #C94F86;
+          --dim: #6B6355; --dimpaper: #B8AE98;
+          --display: "Anton", Impact, "Arial Black", sans-serif; --hand: "Rock Salt", "Segoe Print", "Marker Felt", cursive; --body: "Space Grotesk", system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; background: #1c1a16; color: var(--paper); font-family: var(--body); overflow: hidden; }
+  #wrap { position: relative; width: 1280px; height: 720px; margin: 0 auto; }
+  canvas { display: block; }
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(23, 20, 15, 0.6); }
+  #overlay.results, #overlay.select { background: transparent; }   /* results + song select are drawn on the canvas */
+  #overlay.select { pointer-events: none; }                       /* the canvas takes clicks / wheel / touch on the carousel */
+  #select > * { pointer-events: auto; }
+  #select { position: absolute; inset: 0; display: block; }
+  #select h1 { position: absolute; left: 50%; top: 26px; transform: translateX(-50%) rotate(-2deg); margin: 0; font-size: 50px; padding: 6px 30px 4px; }
+  #onboard { position: absolute; left: 34px; bottom: 34px; max-width: 250px; background: var(--paper); color: var(--ink); font-family: var(--hand); font-size: 12px; line-height: 1.9;
+             text-align: left; padding: 10px 14px; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); transform: rotate(-2deg); word-spacing: 5px; }
+  /* BOSSES: rubber stamp in riso red */
+  #bosses-btn { position: absolute; right: 34px; bottom: 34px; margin: 0; background: transparent; color: var(--red); border: 4px double var(--red); box-shadow: none;
+                font-size: 24px; letter-spacing: 4px; padding: 6px 14px 4px; transform: rotate(-4deg);
+                -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2 -0.3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
+                mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.5' numOctaves='2'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 2 -0.3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>"); }
+  #bosses-btn:hover { background: rgba(208, 57, 46, 0.14); transform: rotate(-4deg) scale(1.04); box-shadow: none; }
+  /* difficulty panel: a paper cut-out taped over the page */
+  #diffpanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-0.5deg); width: 760px; padding: 26px 30px 22px; background: var(--paper); color: var(--ink);
+               border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink), 0 0 0 4000px rgba(23, 20, 15, 0.45); display: flex; flex-direction: column; align-items: center; }
+  #diffpanel::before { content: ""; position: absolute; left: 50%; top: -14px; width: 120px; height: 26px; background: rgba(229, 190, 60, 0.55); transform: translateX(-50%) rotate(-3deg);
+                       border-left: 2px dashed rgba(23,20,15,0.25); border-right: 2px dashed rgba(23,20,15,0.25); }
+  #diff-song { font-family: var(--display); font-size: 32px; letter-spacing: 2px; margin-bottom: 14px; }
+  #diffpanel .hint { color: var(--dim); }
+  #diffpanel #msg { color: var(--ink); font-weight: 700; margin-top: 14px; min-height: 26px; }
+  .close { position: absolute; right: -16px; top: -16px; width: 40px; height: 40px; padding: 0; font-size: 26px; line-height: 34px; background: var(--red); color: var(--paper); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+  .close:hover { background: var(--red); color: var(--paper); }
+  /* difficulty tags: dashed stamps; the chosen one is inked solid */
+  #difficulty { margin-top: 4px; display: flex; align-items: center; gap: 12px; }
+  .diff-btn { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; position: relative; font-family: var(--body); font-weight: 700; font-size: 13px; letter-spacing: 2px;
+              text-transform: uppercase; padding: 9px 16px 7px; min-width: 96px; min-height: 44px; border: 2px dashed var(--ink); background: var(--paper); color: var(--ink); box-shadow: none;
+              transform: none; transition: transform .12s, background .12s; }
+  .diff-btn .dg { font-size: 12px; letter-spacing: 1px; opacity: .85; }
+  .diff-btn canvas { position: absolute; right: -12px; top: -20px; width: 32px; height: 32px; }
+  .diff-btn[data-diff="Easy"]   { color: var(--green); border-color: var(--green); }
+  .diff-btn[data-diff="Normal"] { color: var(--blue); border-color: var(--blue); }
+  .diff-btn[data-diff="Hard"]   { color: var(--red); border-color: var(--red); }
+  .diff-btn[data-diff="Expert"] { color: var(--ink); border-color: var(--ink); }
+  .diff-btn:hover { background: var(--news); transform: translateY(-2px); }
+  .diff-btn.sel { border-style: solid; color: var(--paper); box-shadow: 4px 4px 0 var(--ink); transform: rotate(-3deg) scale(1.08); }
+  .diff-btn.sel[data-diff="Easy"]   { background: var(--green); }
+  .diff-btn.sel[data-diff="Normal"] { background: var(--blue); }
+  .diff-btn.sel[data-diff="Hard"]   { background: var(--red); }
+  .diff-btn.sel[data-diff="Expert"] { background: var(--ink); color: var(--yellow); box-shadow: 4px 4px 0 var(--yellow); }
+  .diff-btn.locked { opacity: .35; }
+  .diff-btn:disabled { opacity: .3; cursor: default; }
+  #start-btn { width: 150px; height: 150px; padding: 0; border-radius: 50%; background: var(--yellow); color: var(--ink); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
+               font-family: var(--display); font-size: 18px; letter-spacing: 1px; line-height: 1.2; margin: 12px 0 18px; display: flex; align-items: center; justify-content: center;
+               text-align: center; box-sizing: border-box; white-space: nowrap; animation: stickerpulse 1.1s ease-in-out infinite; }
+  #start-btn:hover { background: #F0CC55; box-shadow: 5px 5px 0 var(--ink); transform: none; }
+  @keyframes stickerpulse { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(-6deg) scale(1.08); } }
+  .hidden, #file { display: none !important; }
+  .panel { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  h1 { margin: 0 0 26px; font-family: var(--display); font-size: 60px; font-weight: 400; letter-spacing: 3px; color: var(--ink); background: var(--paper); padding: 6px 34px 4px;
+       position: relative; transform: rotate(-2deg); box-shadow: 4px 4px 0 var(--ink); text-shadow: 4px 3px 0 var(--red); }   /* misregistered riso red */
+  h1 span { display: inline-block; }
+  h1::before { content: ""; position: absolute; left: 28%; top: -12px; width: 110px; height: 24px; background: rgba(229, 190, 60, 0.5); transform: rotate(-8deg);     /* tape */
+               border-left: 2px dashed rgba(23,20,15,0.25); border-right: 2px dashed rgba(23,20,15,0.25); }
+  kbd { display: inline-block; min-width: 18px; padding: 3px 9px; margin: 0 6px; font: 700 13px var(--body); line-height: 1.3; color: var(--ink); background: var(--paper);
+        border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); vertical-align: middle; }
+  kbd.arrow { font-size: 18px; padding: 0 12px; line-height: 1.2; }
+  kbd.space { min-width: 120px; letter-spacing: 3px; }
+  #msg { margin-top: 18px; font-size: 18px; color: var(--paper); min-height: 28px; }
+  .row { display: flex; gap: 14px; margin-top: 6px; }
+  .hint { margin-top: 14px; color: var(--dimpaper); font-size: 15px; }
+  #results { position: absolute; left: 0; right: 0; top: 618px; }
+  /* boss collection: photocopied trading cards */
+  #boss-cards { display: flex; gap: 22px; margin-bottom: 22px; }
+  .card { width: 210px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); padding: 14px 10px 12px; position: relative; }
+  .card::before { content: ""; position: absolute; left: 50%; top: -14px; width: 80px; height: 22px; background: rgba(229, 190, 60, 0.55); transform: translateX(-50%) rotate(-4deg); }
+  .card:nth-child(1) { transform: rotate(-3deg); } .card:nth-child(2) { transform: rotate(2deg); } .card:nth-child(3) { transform: rotate(-1.5deg); } .card:nth-child(4) { transform: rotate(3deg); }
+  .card canvas { display: block; margin: 0 auto 6px; }
+  .card .name { font-family: var(--display); font-size: 22px; letter-spacing: 1px; margin-bottom: 4px; }
+  .card .stats { font-family: var(--hand); font-size: 11px; color: var(--dim); min-height: 18px; word-spacing: 4px; }
+  .card.locked { background: var(--kraft); }
+  .card.locked .name { color: var(--dim); letter-spacing: 4px; }
+  button { font-family: var(--display); font-weight: 400; font-size: 18px; letter-spacing: 2px; padding: 10px 26px 8px; background: var(--paper); color: var(--ink); cursor: pointer;
+           border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); transition: transform .08s, box-shadow .08s; }
+  button:hover { background: #FFFFFF; transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+  button:active { transform: translate(4px, 4px); box-shadow: 0 0 0 var(--ink); }
+  button.secondary { background: var(--ink); color: var(--paper); box-shadow: 4px 4px 0 var(--red); }
+  button.secondary:hover { background: #2a2620; box-shadow: 2px 2px 0 var(--red); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="1280" height="720"></canvas>
+  <div id="overlay">
+    <!-- Song select: the carousel is drawn on the canvas; these are the stickers laid over it -->
+    <div id="select" class="panel">
+      <h1><span>RHYTHM RUNNER</span></h1>
+      <div id="onboard" class="hidden">PICK A RECORD<br>↑↓ HIT THE ENEMIES<br>UPLOAD ANY SONG TO MAKE IT A LEVEL</div>
+      <button id="bosses-btn" class="secondary">BOSSES</button>
+      <input type="file" id="file" accept="audio/*,.mp3,.wav,.ogg">
+      <div id="diffpanel" class="hidden">
+        <div id="diff-song"></div>
+        <div id="difficulty">
+          <button class="diff-btn" data-diff="Easy"><span class="dn">EASY</span><span class="dg">—</span></button>
+          <button class="diff-btn" data-diff="Normal"><span class="dn">NORMAL</span><span class="dg">—</span></button>
+          <button class="diff-btn" data-diff="Hard"><span class="dn">HARD</span><span class="dg">—</span></button>
+          <button class="diff-btn" data-diff="Expert"><canvas width="32" height="32"></canvas><span class="dn">EXPERT</span><span class="dg">—</span></button>
+        </div>
+        <div id="msg"></div>
+        <button id="start-btn" class="hidden">TAP · SPACE<br>TO START</button>
+        <div class="hint"><kbd>Esc</kbd> back &nbsp;·&nbsp; <kbd>←</kbd><kbd>→</kbd> pick &nbsp;·&nbsp; <kbd>Enter</kbd> choose</div>
+        <button id="diff-close" class="close">×</button>
+      </div>
+    </div>
+    <!-- Boss collection -->
+    <div id="bosses" class="panel hidden">
+      <h1><span>BOSSES</span></h1>
+      <div id="boss-cards"></div>
+      <div class="hint">Bosses appear on Expert. Meeting one adds it to the collection; bring its HP to 0 to record a win.</div>
+      <button id="bosses-back" class="secondary" style="margin-top:14px">Back</button>
+    </div>
+    <!-- Pause -->
+    <div id="pause" class="panel hidden">
+      <h1><span>PAUSED</span></h1>
+      <div class="row"><button id="resume">Resume</button><button id="pause-title" class="secondary">Back</button></div>
+      <div class="hint"><kbd>Esc</kbd> to resume</div>
+    </div>
+    <!-- Results: numbers, grade and animation are drawn on the canvas; only the buttons live here -->
+    <div id="results" class="panel hidden">
+      <div class="row"><button id="again">PLAY AGAIN</button><button id="results-title" class="secondary">BACK TO SONGS</button></div>
+      <div class="hint"><kbd class="space">SPACE</kbd> to play again</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// =====================================================================
+// (0) ART CONSTANTS — every color lives in PALETTE, every width / radius / opacity in STYLE
+// =====================================================================
+// "Xerox zine": riso inks on newsprint. Key names kept for the lane / accent roles they play in the renderer.
+const PALETTE = {
+  asphalt: '#1c1a16', concrete: '#2e2a24', concreteLight: '#413c34',   // photocopy blacks: base / secondary / light
+  orange: '#D0392E',        // ground lane, ground enemies (riso red)
+  teal: '#3E74C8',          // air lane, air enemies (riso blue, lifted a step so it reads on the dark scene)
+  paper: '#F6F1E4',         // outlines & text (paper)
+  paperDim: '#B8AE98',      // muted paper / aged newsprint (Good text)
+  ink: '#17140F',           // outlines & text (ink black)
+  yellow: '#E5BE3C',        // accent: fever / SSS / boss only (riso yellow)
+  magenta: '#C94F86',       // high-energy background accent, Miss (riso fluorescent pink)
+  green: '#2F8A66',         // riso green: Easy tag, record labels
+  kraft: '#C9A978',         // kraft card: upload sleeve, locked cards
+  newsprint: '#E8E1CF',     // the song-select page
+  blueInk: '#2D5BA8',       // riso blue as printed on the page (menus); the lane uses `teal`
+};
+const STYLE = {
+  inkStroke: 3, inkStrokeLight: 2, paperStroke: 2,          // sticker outline: ink (shadow side / light side) + white border
+  pencilStroke: 1, pencilAlpha: 0.45, pencilOffset: 1.5,    // second hand-drawn line
+  feverOutline: 2, jitter: 2, radius: 14,
+  ringRadius: 30, ringSegments: 7, ringGap: 0.22, ringStroke: 3, ringDot: 7,
+  textSkewDeg: 6, textOutline: 3, textShadow: 4, comboTilt: -4,
+  holdBarHeight: 22,
+  grainAlpha: 0.06, halftoneAlpha: 0.35, halftoneDot: 3, halftoneStep: 6,
+  contactShadowAlpha: 0.3,
+  stickerAlphaMin: 0.10, stickerAlphaMax: 0.35, lettersAlpha: 0.25, magentaAlpha: 0.5,
+  feverWashAlpha: 0.4, feverMagentaAlpha: 0.6, speedLinesMax: 10, speedLinesFever: 16,
+  bossDarken: 0.35, bossVignetteAlpha: 0.55,
+  misregOffset: 2, misregTextOffset: 3, misregAlpha: 0.5, misregHitSec: 0.12, bossFlashSec: 0.2,
+  poseStepSec: 0.1,                                        // comic "on twos": pose frames step every 100ms
+  scrollSlow: 0.5, scrollFast: 1.5, intensitySmoothSec: 0.35,
+  cloneAlpha: 0.4,
+};
+// Comic onomatopoeia used by the judgment popups (presentation only).
+const ONO = { Perfect: ['BAM!', 'POW!', 'KRAK!'], Good: ['TAP'], hold: 'SHRED!', mash: 'WHAM', miss: 'MISS', ko: 'K.O.' };
+const onoWord = j => { const w = ONO[j] || ONO.Good; return w[(Math.random() * w.length) | 0]; };
+
+// =====================================================================
+// (1) AUDIO ANALYSIS & CHART GENERATION
+//     Input: decoded AudioBuffer. Output: { bpm, notes:[{time,lane}], sections:[{start,end,intensity}] }
+// =====================================================================
+
+const ANALYSIS = {
+  frameSize: 2048,        // FFT size in samples
+  hopSec: 0.020,          // hop between analysis frames (seconds)
+  bandCount: 48,          // log-spaced bands the spectrum is pooled into before computing flux (balances kick vs hats)
+  peakWindowSec: 0.5,     // half-width of the sliding window used for the adaptive threshold
+  peakK: 1.0,             // threshold = window mean + peakK * window std  (higher = fewer onsets)
+  peakFloorFrac: 0.06,    // absolute floor as a fraction of the global max flux (kills noise peaks in silence)
+  minBpm: 60, maxBpm: 180,
+  snapMaxShiftMs: 70,     // onsets farther than this from the 1/2-beat grid keep their detected time (off-grid hits)
+  laneCentroidHz: null,   // spectral-centroid split ground/air in Hz; null = median centroid of all onsets
+  doubleTopFrac: 0.10,    // onsets in the top 10% strength become double hits (both lanes)
+  maxPerSecond: 8,        // density cap: max enemies in any 1-second window (halved in low-intensity sections)
+  minLaneGapSec: 0.08,    // minimum gap between consecutive enemies on the same lane
+  sectionSec: 12,         // section length for the intensity curve
+  lowIntensity: 0.4,      // sections with intensity below this get the halved density cap
+  // note-type decoration (holdFrac / ghostFrac / monsterEverySec are overwritten by applyDifficulty)
+  holdFrac: 0.4,          // share of eligible taps (followed by a gap on their lane) that become hold bars
+  holdMinBeats: 1.5,      // a tap needs at least this gap after it to become a hold
+  holdMaxBeats: 4,        // longest hold
+  ghostFrac: 0.1,         // share of single taps that become ghosts (invisible mid-approach)
+  monsterEverySec: 25,    // one mash-monster roughly every N seconds (0 = none); it clears its window of other enemies
+  monsterBeats: 4,        // monster window length in beats; hits needed = one per half-beat
+};
+
+// Analysis yields to the browser between chunks so the "Analyzing..." text can paint.
+// (This is the only place a timer is used; game time itself is driven purely by audioContext.currentTime.)
+const yieldToBrowser = () => new Promise(r => setTimeout(r, 0));
+
+// Radix-2 iterative FFT for real input. Returns fn(input[N]) -> writes magnitudes[N/2].
+function makeFFT(n) {
+  const levels = Math.round(Math.log2(n));
+  const rev = new Uint32Array(n);
+  for (let i = 0; i < n; i++) { let r = 0, x = i; for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+  const cosT = new Float32Array(n / 2), sinT = new Float32Array(n / 2);
+  for (let i = 0; i < n / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / n); sinT[i] = Math.sin(2 * Math.PI * i / n); }
+  const re = new Float32Array(n), im = new Float32Array(n);
+  return function fft(input, mags) {
+    for (let i = 0; i < n; i++) { re[i] = input[rev[i]]; im[i] = 0; }
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let j = 0, k = 0; j < half; j++, k += step) {
+          const l = i + j + half;
+          const tr = re[l] * cosT[k] + im[l] * sinT[k];
+          const ti = im[l] * cosT[k] - re[l] * sinT[k];
+          re[l] = re[i + j] - tr; im[l] = im[i + j] - ti;
+          re[i + j] += tr; im[i + j] += ti;
+        }
+      }
+    }
+    for (let i = 0; i < n / 2; i++) mags[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+  };
+}
+
+// ---- Section intensity -> density parameters -----------------------------------------------
+// Single replaceable mapping. Swap this function for an AI-driven difficulty curve later:
+// it receives the normalized section intensity (0..1) and returns the density limits for that section.
+function densityParamsFor(intensity) {
+  if (intensity < ANALYSIS.lowIntensity) {
+    return { maxPerSecond: ANALYSIS.maxPerSecond / 2, minLaneGapSec: ANALYSIS.minLaneGapSec }; // low: halve the cap
+  }
+  return { maxPerSecond: ANALYSIS.maxPerSecond, minLaneGapSec: ANALYSIS.minLaneGapSec };       // high: keep the cap
+}
+// --------------------------------------------------------------------------------------------
+
+// Coarse BPM via autocorrelation of the onset-strength curve, with a mild prior around 120 BPM.
+function estimateBpmAutocorr(odf, hopSec) {
+  const n = odf.length;
+  let mean = 0; for (let i = 0; i < n; i++) mean += odf[i]; mean /= Math.max(1, n);
+  const lagMin = Math.max(1, Math.floor(60 / ANALYSIS.maxBpm / hopSec));
+  const lagMax = Math.min(n - 1, Math.ceil(60 / ANALYSIS.minBpm / hopSec));
+  let bestLag = -1, bestScore = -Infinity;
+  for (let L = lagMin; L <= lagMax; L++) {
+    let s = 0;
+    for (let i = 0; i + L < n; i++) s += (odf[i] - mean) * (odf[i + L] - mean);
+    s /= (n - L);
+    const bpm = 60 / (L * hopSec);
+    const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 120) / 0.6, 2));
+    const score = s * prior;
+    if (score > bestScore) { bestScore = score; bestLag = L; }
+  }
+  return bestLag < 0 ? 120 : 60 / (bestLag * hopSec);
+}
+
+// Refine BPM to 0.01 resolution: maximize how well strength-weighted onsets align to a 1/2-beat grid.
+function refineBpm(onsets, bpm0, hopSec) {
+  const clamp = b => Math.min(ANALYSIS.maxBpm, Math.max(ANALYSIS.minBpm, b));
+  if (onsets.length < 8) return clamp(bpm0);
+  const L0 = 60 / bpm0 / hopSec;
+  const lo = clamp(60 / ((L0 + 1) * hopSec)), hi = clamp(60 / ((L0 - 1) * hopSec));
+  let best = bpm0, bestMag = -1;
+  for (let bpm = lo; bpm <= hi; bpm += 0.01) {
+    const w = 2 * Math.PI * bpm / 30;                       // 1/2-beat angular frequency
+    let re = 0, im = 0;
+    for (const o of onsets) { re += o.strength * Math.cos(w * o.time); im += o.strength * Math.sin(w * o.time); }
+    const mag = re * re + im * im;
+    if (mag > bestMag) { bestMag = mag; best = bpm; }
+  }
+  return Math.round(best * 100) / 100;
+}
+
+// A flux peak only says "somewhere inside this frame". Refine to sample accuracy by finding the steepest
+// energy rise of the pre-emphasized (high-passed) signal in short ~1.5ms blocks around the frame.
+function refineOnsetSample(mono, sr, frameStart, N) {
+  const B = Math.max(16, Math.round(sr * 0.0015));
+  const from = Math.max(1, frameStart - 2 * B), to = Math.min(mono.length, frameStart + N);
+  const nb = Math.floor((to - from) / B);
+  const fallback = frameStart + (N >> 2);
+  if (nb < 6) return fallback;
+  const e = new Float64Array(nb);
+  for (let j = 0; j < nb; j++) {
+    let s = 0; const o = from + j * B;
+    for (let i = 0; i < B; i++) { const d = mono[o + i] - mono[o + i - 1]; s += d * d; }
+    e[j] = s;
+  }
+  const jMax = Math.min(nb - 1, Math.floor((frameStart + N * 0.75 - from) / B));
+  let best = -1, bestRise = 0, total = 0;
+  for (let j = 2; j < jMax; j++) {
+    const rise = (e[j] + e[j + 1]) - (e[j - 1] + e[j - 2]);
+    total += Math.abs(rise);
+    if (rise > bestRise) { bestRise = rise; best = j; }
+  }
+  if (best < 0 || bestRise < 0.15 * total) return fallback;   // no clear transient: keep the frame estimate
+  return from + best * B;
+}
+
+// Turns some plain taps into holds, ghosts and mash-monsters. Deterministic per song (seeded PRNG).
+function decorateNotes(taps, bpm, sections, secLen, duration) {
+  const beat = 60 / bpm, half = beat / 2;
+  let seed = (taps.length * 7919 + Math.round(bpm * 100)) >>> 0;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const sectionAt = t => sections[Math.min(sections.length - 1, Math.max(0, Math.floor(t / secLen)))];
+  let notes = taps.map(n => ({ time: n.time, lane: n.lane, strength: n.strength, type: 'tap' }));
+
+  // 1. monsters: anchored on strong onsets in lively sections, spaced apart; everything else in the window is removed
+  if (ANALYSIS.monsterEverySec > 0) {
+    const dur = ANALYSIS.monsterBeats * beat, maxCount = Math.floor(duration / ANALYSIS.monsterEverySec);
+    const cands = notes.filter(n => n.time >= 8 && n.time + dur < duration - 2 && sectionAt(n.time).intensity >= 0.5)
+                       .sort((a, b) => b.strength - a.strength);
+    const monsters = [];
+    for (const c of cands) {
+      if (monsters.length >= maxCount) break;
+      if (monsters.every(m => Math.abs(m.time - c.time) >= ANALYSIS.monsterEverySec)) monsters.push(c);
+    }
+    for (const m of monsters) {
+      m.type = 'monster'; m.duration = dur; m.hits = Math.max(4, Math.round(dur / half));
+      notes = notes.filter(n => n === m || n.time < m.time - 1e-6 || n.time >= m.time + dur + half + 0.002);
+    }
+  }
+  notes.sort((a, b) => a.time - b.time || a.lane - b.lane);
+
+  // 2. holds: a tap followed by a gap on its own lane becomes a hold bar (no overlapping holds, none into a monster)
+  const holds = [];
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    if (n.type !== 'tap') continue;
+    let next = Infinity;
+    for (let j = i + 1; j < notes.length; j++) if (notes[j].lane === n.lane) { next = notes[j].time; break; }
+    const gap = Math.min(next, duration - 0.3) - n.time;               // never hold past the end of the song
+    if (gap < ANALYSIS.holdMinBeats * beat) continue;
+    const dur = Math.max(beat, Math.floor(Math.min(gap - half, ANALYSIS.holdMaxBeats * beat) / half) * half);
+    if (n.time + dur > duration - 0.3) continue;
+    if (notes.some(m => m.type === 'monster' && m.time < n.time + dur + half && m.time + m.duration > n.time)) continue;
+    if (holds.some(h => n.time < h.time + h.duration + half && h.time < n.time + dur + half)) continue;
+    if (rnd() > ANALYSIS.holdFrac) continue;
+    n.type = 'hold'; n.duration = dur; holds.push(n);
+  }
+
+  // 3. ghosts: single taps (not half of a double hit) that turn invisible during the approach
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    if (n.type !== 'tap' || n.time < 6) continue;
+    const dbl = (i > 0 && Math.abs(notes[i - 1].time - n.time) < 1e-6) || (i + 1 < notes.length && Math.abs(notes[i + 1].time - n.time) < 1e-6);
+    if (!dbl && rnd() < ANALYSIS.ghostFrac) n.type = 'ghost';
+  }
+  return notes;
+}
+
+async function generateChart(buffer, onProgress) {
+  await yieldToBrowser();
+  const sr = buffer.sampleRate, N = ANALYSIS.frameSize;
+  const hop = Math.max(1, Math.round(ANALYSIS.hopSec * sr)), hopSec = hop / sr;
+  const duration = buffer.duration;
+
+  // ---- 1. downmix to mono ----
+  const len = buffer.length;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < buffer.numberOfChannels; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += d[i];
+  }
+  if (buffer.numberOfChannels > 1) { const g = 1 / buffer.numberOfChannels; for (let i = 0; i < len; i++) mono[i] *= g; }
+
+  // ---- 2. framing + FFT -> spectral flux (onset strength) and spectral centroid per frame ----
+  const numFrames = Math.max(1, Math.floor((len - N) / hop) + 1);
+  const flux = new Float32Array(numFrames), centroid = new Float32Array(numFrames);
+  const fft = makeFFT(N);
+  const hann = new Float32Array(N);
+  for (let i = 0; i < N; i++) hann[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
+  const buf = new Float32Array(N), bins = N / 2, binHz = sr / N, mags = new Float32Array(bins);
+  // bin -> log-spaced band map (40 Hz .. 16 kHz); pooling into bands keeps a kick from being outvoted by hi-hats
+  const nBands = ANALYSIS.bandCount, fLo = 40, fHi = Math.min(16000, sr / 2);
+  const binBand = new Int16Array(bins).fill(-1);
+  for (let k = 1; k < bins; k++) {
+    const fq = k * binHz;
+    if (fq >= fLo && fq <= fHi) binBand[k] = Math.min(nBands - 1, Math.floor(Math.log(fq / fLo) / Math.log(fHi / fLo) * nBands));
+  }
+  let prev = new Float32Array(nBands), cur = new Float32Array(nBands);
+  for (let f = 0; f < numFrames; f++) {
+    const off = f * hop;
+    for (let i = 0; i < N; i++) buf[i] = mono[off + i] * hann[i];
+    fft(buf, mags);
+    let wsum = 0, msum = 0;
+    cur.fill(0);
+    for (let k = 1; k < bins; k++) {
+      const m = mags[k];
+      wsum += k * m; msum += m;
+      const b = binBand[k];
+      if (b >= 0) cur[b] += m * m;
+    }
+    let fl = 0;
+    for (let b = 0; b < nBands; b++) {
+      cur[b] = Math.log1p(cur[b] * 1e-3);    // log-compressed band energy
+      const d = cur[b] - prev[b];
+      if (d > 0) fl += d;                    // half-wave rectified spectral flux
+    }
+    flux[f] = fl;
+    centroid[f] = msum > 0 ? (wsum / msum) * binHz : 0;
+    const t = prev; prev = cur; cur = t;
+    if ((f & 63) === 63) { if (onProgress) onProgress(f / numFrames); await yieldToBrowser(); }   // short chunks keep the carousel smooth
+  }
+
+  // ---- 3. peak picking with adaptive threshold (sliding mean + k*std) ----
+  const Wn = Math.max(1, Math.round(ANALYSIS.peakWindowSec / hopSec));
+  let maxFlux = 0; for (let f = 0; f < numFrames; f++) if (flux[f] > maxFlux) maxFlux = flux[f];
+  const floor = ANALYSIS.peakFloorFrac * maxFlux;
+  const ps = new Float64Array(numFrames + 1), ps2 = new Float64Array(numFrames + 1);
+  for (let f = 0; f < numFrames; f++) { ps[f + 1] = ps[f] + flux[f]; ps2[f + 1] = ps2[f] + flux[f] * flux[f]; }
+  const onsets = [];                                   // { time, strength, frame }
+  for (let f = 1; f < numFrames - 1; f++) {
+    const v = flux[f];
+    if (v <= flux[f - 1] || v < flux[f + 1] || v < floor) continue;
+    const a = Math.max(0, f - Wn), b = Math.min(numFrames, f + Wn + 1), n = b - a;
+    const mean = (ps[b] - ps[a]) / n;
+    const variance = Math.max(0, (ps2[b] - ps2[a]) / n - mean * mean);
+    if (v <= mean + ANALYSIS.peakK * Math.sqrt(variance)) continue;
+    onsets.push({ time: refineOnsetSample(mono, sr, f * hop, N) / sr, strength: maxFlux > 0 ? v / maxFlux : 0, frame: f });
+  }
+
+  // ---- 4. BPM estimate (autocorrelation, then fine refinement) ----
+  const bpm = refineBpm(onsets, estimateBpmAutocorr(flux, hopSec), hopSec);
+  const halfBeat = 30 / bpm;
+
+  // ---- 5. sections + intensity (mean onset strength, normalized 0..1) ----
+  const secCount = Math.max(1, Math.round(duration / ANALYSIS.sectionSec));
+  const secLen = duration / secCount;
+  const sections = [];
+  for (let s = 0; s < secCount; s++) {
+    const start = s * secLen, end = Math.min(duration, (s + 1) * secLen);
+    const fa = Math.min(numFrames, Math.floor(start / hopSec)), fb = Math.min(numFrames, Math.floor(end / hopSec));
+    let m = 0; for (let f = fa; f < fb; f++) m += flux[f];
+    sections.push({ start, end, meanFlux: fb > fa ? m / (fb - fa) : 0, intensity: 0 });
+  }
+  const maxMean = Math.max(1e-9, ...sections.map(s => s.meanFlux));
+  for (const s of sections) s.intensity = s.meanFlux / maxMean;
+  const sectionAt = t => sections[Math.min(sections.length - 1, Math.max(0, Math.floor(t / secLen)))];
+
+  // ---- 6. snap onsets to the 1/2-beat grid (grid phase estimated per section to absorb drift) ----
+  const gridPhase = list => {
+    let re = 0, im = 0;
+    for (const o of list) { const a = 2 * Math.PI * o.time / halfBeat; re += o.strength * Math.cos(a); im += o.strength * Math.sin(a); }
+    return Math.atan2(im, re) / (2 * Math.PI) * halfBeat;
+  };
+  const globalPhase = gridPhase(onsets);
+  const snapMax = ANALYSIS.snapMaxShiftMs / 1000;
+  for (const sec of sections) {
+    const inSec = onsets.filter(o => o.time >= sec.start && o.time < sec.end);
+    const ph = inSec.length >= 4 ? gridPhase(inSec) : globalPhase;
+    for (const o of inSec) {
+      const snapped = ph + Math.round((o.time - ph) / halfBeat) * halfBeat;
+      if (Math.abs(snapped - o.time) <= snapMax) o.time = Math.max(0, snapped);
+    }
+  }
+
+  // ---- 7. lane assignment (spectral centroid) + double hits (top 10% strength) ----
+  const cents = onsets.map(o => centroid[o.frame]).sort((a, b) => a - b);
+  const split = ANALYSIS.laneCentroidHz != null ? ANALYSIS.laneCentroidHz : (cents.length ? cents[cents.length >> 1] : 2000);
+  const strengths = onsets.map(o => o.strength).sort((a, b) => b - a);
+  const doubleCount = Math.floor(strengths.length * ANALYSIS.doubleTopFrac);
+  const doubleThresh = doubleCount > 0 ? strengths[doubleCount - 1] : Infinity;
+  const candidates = [];
+  for (const o of onsets) {
+    if (o.strength >= doubleThresh) {
+      candidates.push({ time: o.time, lane: 0, strength: o.strength }, { time: o.time, lane: 1, strength: o.strength });
+    } else {
+      candidates.push({ time: o.time, lane: centroid[o.frame] < split ? 0 : 1, strength: o.strength });
+    }
+  }
+  candidates.sort((a, b) => b.strength - a.strength);   // strongest first: weaker onsets are the ones dropped
+
+  // ---- 8. density limits (per-lane gap, 1-second window cap from the section's density params) ----
+  const accepted = [];
+  const buckets = new Map();                             // floor(second) -> accepted notes, for local lookups
+  const near = t => {
+    const out = [], b = Math.floor(t);
+    for (let k = b - 1; k <= b + 1; k++) { const arr = buckets.get(k); if (arr) for (const n of arr) if (Math.abs(n.time - t) <= 1.0001) out.push(n); }
+    return out;
+  };
+  for (const c of candidates) {
+    const params = densityParamsFor(sectionAt(c.time).intensity);
+    const nb = near(c.time);
+    let ok = true;
+    for (const n of nb) if (n.lane === c.lane && Math.abs(n.time - c.time) < params.minLaneGapSec) { ok = false; break; }
+    if (!ok) continue;
+    const starts = [c.time - 1];                         // every 1-second window that would contain c
+    for (const n of nb) if (n.time <= c.time) starts.push(n.time);
+    for (const s of starts) {
+      let cnt = 1;
+      for (const n of nb) if (n.time >= s - 1e-6 && n.time <= s + 1 + 1e-6) cnt++;
+      if (cnt > params.maxPerSecond) { ok = false; break; }
+    }
+    if (!ok) continue;
+    accepted.push(c);
+    const b = Math.floor(c.time);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b).push(c);
+  }
+  accepted.sort((a, b) => a.time - b.time || a.lane - b.lane);
+
+  // ---- 9. note types: holds, ghosts, monsters ----
+  const decorated = decorateNotes(accepted, bpm, sections, secLen, duration);
+  const r3 = v => Math.round(v * 1000) / 1000;
+  const typeCounts = {};
+  for (const n of decorated) typeCounts[n.type] = (typeCounts[n.type] || 0) + 1;
+
+  const chart = {
+    bpm,
+    notes: decorated.map(n => {
+      const o = { time: r3(n.time), lane: n.lane, type: n.type };
+      if (n.duration) o.duration = r3(n.duration);
+      if (n.hits) o.hits = n.hits;
+      return o;
+    }),
+    sections: sections.map(s => ({ start: +s.start.toFixed(3), end: +s.end.toFixed(3), intensity: +s.intensity.toFixed(3) })),
+  };
+  console.log(`[chart] bpm=${bpm} onsets=${onsets.length} notes=${chart.notes.length} laneSplit=${Math.round(split)}Hz types=${JSON.stringify(typeCounts)}`);
+  console.log('[chart] ' + JSON.stringify(chart));
+  return chart;
+}
+
+// =====================================================================
+// (2) GAME STATE & JUDGMENT
+//     All game time comes from audioCtx.currentTime; nothing here advances time by frames or timers.
+// =====================================================================
+
+const CONFIG = {
+  audioOffset: 0,      // ms. Increase if enemies reach the ring BEFORE you hear the beat; decrease if AFTER.
+  approachTime: 2.0,   // seconds for an enemy to travel from the right edge to the hit ring (smaller = faster scroll)
+  perfectMs: 50, goodMs: 120,   // judgment windows; overwritten by applyDifficulty()
+  missMs: 150,         // an un-hit enemy this far past the ring is a Miss (never less than goodMs)
+  leadInSec: 2.0,      // silence before the song starts so the first enemies get a full approach
+  graceSec: 3.0,       // GRACE PERIOD: after a visible Miss, further Misses are silent (stats only) for this long
+  hintSec: 8.0,        // key letters are drawn above incoming enemies for the first N seconds of gameplay
+  // FEVER
+  feverGainPerfect: 3, // gauge points per Perfect
+  feverGainGood: 1,    // gauge points per Good (Miss / empty press: no change)
+  feverCapacityPerNote: 0.75,   // gauge capacity = total notes * 0.75  (= total * 3 / 4)
+  feverBeats: 8,       // fever length in beats of the detected BPM
+  feverScoreMult: 2,   // score gains are multiplied by this during fever
+  // holds / monsters
+  holdTickScore: 10,   // score per half-beat while a hold is kept (x multiplier, x fever)
+  mashScore: 10,       // score per press on a monster (x multiplier, x fever)
+  holdReleaseTolerance: 0.2,   // seconds before the hold's end at which releasing still counts as complete
+};
+
+// ---- Per-difficulty parameters (tune here) -------------------------------------------------
+// Applied by applyDifficulty() BEFORE chart generation; changing the selection regenerates the chart.
+// emptyPenalty: pressing a key with no enemy in the Good window resets combo/multiplier (anti-mashing).
+// holdFrac / ghostFrac / monsterEverySec: how many holds and ghosts, and how often a mash-monster appears.
+const DIFFICULTY = {
+  Easy:   { peakK: 1.30, maxPerSecond: 3, doubleTopFrac: 0.00, perfectMs: 80, goodMs: 160, emptyPenalty: false, holdFrac: 0.35, ghostFrac: 0.00, monsterEverySec: 30 },
+  Normal: { peakK: 1.25, maxPerSecond: 3, doubleTopFrac: 0.03, perfectMs: 60, goodMs: 140, emptyPenalty: true,  holdFrac: 0.35, ghostFrac: 0.05, monsterEverySec: 30 },
+  Hard:   { peakK: 0.95, maxPerSecond: 6, doubleTopFrac: 0.08, perfectMs: 50, goodMs: 120, emptyPenalty: true,  holdFrac: 0.45, ghostFrac: 0.20, monsterEverySec: 20 },
+  Expert: { peakK: 0.70, maxPerSecond: 8, doubleTopFrac: 0.10, perfectMs: 50, goodMs: 120, emptyPenalty: true,  holdFrac: 0.50, ghostFrac: 0.30, monsterEverySec: 18,
+            unlock: { after: 'Hard', minGrade: 'C' } },   // per song: finish Hard on that song (any grade) to unlock Expert
+};
+// Is `diff` playable on this song? (Expert needs a finished Hard run on the same song.)
+function isDiffUnlocked(songId, diff) {
+  const u = DIFFICULTY[diff].unlock;
+  if (!u) return true;
+  const best = loadBest(songId, u.after);
+  return !!best && gradeRank(best.grade) >= gradeRank(u.minGrade);
+}
+const DIFF_ORDER = Object.keys(DIFFICULTY);
+function highestUnlocked(songId, wanted) {            // wanted if unlocked, else the hardest unlocked difficulty below it
+  if (isDiffUnlocked(songId, wanted)) return wanted;
+  for (let i = DIFF_ORDER.indexOf(wanted) - 1; i >= 0; i--) if (isDiffUnlocked(songId, DIFF_ORDER[i])) return DIFF_ORDER[i];
+  return DIFF_ORDER[0];
+}
+let difficulty = 'Normal';
+function applyDifficulty(name) {
+  const d = DIFFICULTY[name];
+  difficulty = name;
+  ANALYSIS.peakK = d.peakK;
+  ANALYSIS.maxPerSecond = d.maxPerSecond;   // low-intensity sections still halve this (densityParamsFor)
+  ANALYSIS.doubleTopFrac = d.doubleTopFrac;
+  ANALYSIS.holdFrac = d.holdFrac;
+  ANALYSIS.ghostFrac = d.ghostFrac;
+  ANALYSIS.monsterEverySec = d.monsterEverySec;
+  CONFIG.perfectMs = d.perfectMs;
+  CONFIG.goodMs = d.goodMs;
+}
+// --------------------------------------------------------------------------------------------
+
+// ---- Grade thresholds (tune here). accuracy = (Perfect + 0.5 * Good) / total notes ------------
+const GRADES = [
+  { grade: 'SSS', min: 1.00, color: PALETTE.yellow },        // 100%: all Perfect, zero Miss
+  { grade: 'S',   min: 0.90, color: PALETTE.teal },
+  { grade: 'A',   min: 0.80, color: PALETTE.orange },
+  { grade: 'B',   min: 0.70, color: PALETTE.ink },
+  { grade: 'C',   min: 0.00, color: PALETTE.paperDim },
+];
+function gradeFor(accuracy, misses) {
+  for (const g of GRADES) {
+    if (g.grade === 'SSS' && misses > 0) continue;
+    if (accuracy >= g.min - 1e-9) return g;
+  }
+  return GRADES[GRADES.length - 1];
+}
+const gradeRank = grade => GRADES.length - 1 - GRADES.findIndex(g => g.grade === grade);
+// --------------------------------------------------------------------------------------------
+
+// ---- Bosses (Expert only) -------------------------------------------------------------------
+const BOSSES = [
+  { id: 'brute',   name: 'HORNED BRUTE',  color: PALETTE.orange },
+  { id: 'eye',     name: 'FLOATING EYE',  color: PALETTE.magenta },
+  { id: 'serpent', name: 'SERPENT',       color: PALETTE.teal },
+  { id: 'golem',   name: 'CRYSTAL GOLEM', color: PALETTE.yellow },
+];
+const BOSS_RULES = { difficulty: 'Expert', minIntensity: 0.7, minSpacingSec: 30, maxAppearances: 3, fallbackCount: 2, earliestFrac: 1 / 3,
+                     waveSize: 8, waveClearRatio: 0.8 };   // summoned enemies come in waves; clearing >= 80% of a wave costs the boss 1 HP
+const hashName = str => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; };
+const bossForSong = name => BOSSES[hashName(name) % BOSSES.length];   // deterministic per file name
+
+// Highest-intensity sections, spaced apart; if fewer than 2 qualify, the top 2 overall.
+// Only sections starting at or after earliestFrac of the song are eligible (no boss right at the start).
+function pickBossSections(sections, duration) {
+  let eligible = sections.filter(sec => sec.start >= duration * BOSS_RULES.earliestFrac - 1e-6);
+  if (!eligible.length) eligible = sections.slice(-1);
+  const byIntensity = [...eligible].sort((a, b) => b.intensity - a.intensity);
+  const pick = (cands, max) => {
+    const out = [];
+    for (const sec of cands) {
+      if (out.length >= max) break;
+      if (out.every(o => Math.abs(o.start - sec.start) >= BOSS_RULES.minSpacingSec)) out.push(sec);
+    }
+    return out;
+  };
+  let chosen = pick(byIntensity.filter(sec => sec.intensity >= BOSS_RULES.minIntensity), BOSS_RULES.maxAppearances);
+  if (chosen.length < 2) chosen = pick(byIntensity, BOSS_RULES.fallbackCount);
+  if (chosen.length < 2) chosen = byIntensity.slice(0, BOSS_RULES.fallbackCount);
+  return chosen.sort((a, b) => a.start - b.start).map(sec => ({ start: sec.start, end: sec.end }));
+}
+
+// Collection persistence: { [bossId]: { unlocked, defeated, escaped } }. Cached in memory so it also
+// works for the session when localStorage is unavailable.
+const COLLECTION_KEY = 'rhythmrunner:bosses';
+let collectionCache = null;
+function loadCollection() {
+  if (collectionCache) return collectionCache;
+  try { collectionCache = JSON.parse(localStorage.getItem(COLLECTION_KEY)) || {}; } catch (e) { collectionCache = {}; }
+  return collectionCache;
+}
+function saveCollection(c) {
+  collectionCache = c;
+  try { localStorage.setItem(COLLECTION_KEY, JSON.stringify(c)); } catch (e) { /* storage unavailable */ }
+}
+// --------------------------------------------------------------------------------------------
+
+const SCORE = { Perfect: 100, Good: 50, Miss: 0 };
+const COLORS = { Perfect: PALETTE.paper, Good: PALETTE.paperDim, Miss: PALETTE.magenta };
+const LANE_COLORS = [PALETTE.orange, PALETTE.teal];
+const LANE_KEYS = ['↓', '↑'];            // key labels shown in game (F / J still work as alternatives)
+const W = 1280, H = 720;
+const CHAR_X = Math.round(W * 0.2);      // hit position (center of both rings)
+const CHAR_STAND_X = CHAR_X - 64;        // the character stands left of the rings and attacks into them
+const MONSTER_PIN_X = CHAR_X + 30;       // where a mash-monster sits during its window (clear of the runner)
+const LANE_Y = [560, 380];               // 0 = ground, 1 = air
+const FLOOR_Y = LANE_Y[0] + 44;
+const speed = () => (W - CHAR_X) / CONFIG.approachTime;   // px per second
+const perfectRadius = () => CONFIG.perfectMs / 1000 * speed();   // inner ring: exactly the Perfect window
+const goodRadius = () => CONFIG.goodMs / 1000 * speed();         // outer ring: exactly the Good window
+const comboMultiplier = c => Math.min(2.0, 1 + 0.1 * Math.floor(c / 20));   // +0.1x every 20 hits, capped at 2.0x
+const missSec = () => Math.max(CONFIG.missMs, CONFIG.goodMs) / 1000;
+
+let audioCtx = null, audioBuffer = null, chart = null, source = null, loadedName = '', loadedTitle = '';   // loadedName = song id (storage key)
+let demoMode = false, demoTime = 0;      // silent attract demo on the song-select screen (cosmetic clock, no audio)
+let state = 'select';                    // select | analyzing | ready | demo | playing | paused | results
+let songStart = 0;                       // audioCtx.currentTime at which song time 0 is played
+let notes = [], head = 0;                // runtime notes sorted by time; head = first note still worth looking at
+let score = 0, combo = 0, maxCombo = 0, multiplier = 1, counts = { Perfect: 0, Good: 0, Miss: 0 }, lastJudge = '';
+let lastAttackAt = -1e9, lastMissAt = -1e9, graceUntil = -1e9, cloneAt = -1e9;
+let ringHitAt = [-1e9, -1e9];            // song time of the last hit on each ring (ring flash)
+let ringEmptyAt = [-1e9, -1e9];          // song time of the last empty press on each ring (grey flash)
+let bursts = [], popups = [];            // expanding rings emitted from a hit ring; judgment text popups
+let results = null;                      // filled by finishGame(): what the results screen shows
+let boss = null;                         // Expert only: { def, sections, waves, hp, maxHp, hitAt }
+const heldKeys = [new Set(), new Set()]; // physical keys currently held per lane (for hold notes)
+let feverGauge = 0, feverCapacity = 1, feverUntil = -1e9;   // fever gauge (points) and fever end (song time)
+
+const songTime = () => demoMode ? demoTime : audioCtx.currentTime - songStart - CONFIG.audioOffset / 1000;
+const inGame = () => state === 'playing' || state === 'paused' || state === 'demo';
+const feverActive = st => st < feverUntil;
+const halfBeatSec = () => 30 / chart.bpm;
+const resolved = n => n.state === 1 || n.state === 2;   // note states: 0 pending, 1 hit / completed, 2 missed, 3 holding
+
+// Create / resume the AudioContext. Must be called from a user-gesture handler (click, key, drop)
+// so audio works inside an itch.io iframe.
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended' && state !== 'paused') audioCtx.resume();
+  return audioCtx;
+}
+
+// Local best scores: one record per song file name + difficulty. Works (silently) without storage.
+const STORAGE_PREFIX = 'rhythmrunner:best:';
+function loadBest(name, diff) {
+  try { const v = localStorage.getItem(STORAGE_PREFIX + name + '|' + diff); return v ? JSON.parse(v) : null; }
+  catch (e) { return null; }
+}
+function saveBest(name, diff, rec) {
+  try { localStorage.setItem(STORAGE_PREFIX + name + '|' + diff, JSON.stringify(rec)); } catch (e) { /* storage unavailable */ }
+}
+
+function stopSource() {
+  if (!source) return;
+  try { source.stop(); } catch (e) { /* not started yet */ }
+  source.disconnect();
+  source = null;
+}
+
+function startGame(demo = false) {
+  stopSource();
+  if (!demo) ensureAudio();
+  notes = chart.notes.map(n => ({
+    time: n.time, lane: n.lane, type: n.type || 'tap', duration: n.duration || 0, endTime: n.time + (n.duration || 0),
+    hitsNeeded: n.hits || 0, hits: 0, nextTick: 0, lastMash: -1e9,
+    state: 0, judge: '', hitTime: 0, hitX: 0, summoned: false,
+    face: (Math.random() * 5) | 0, wear: (Math.random() * 4) | 0, wob: (Math.random() * 4) | 0,   // art variants chosen at spawn
+  }));
+  head = 0; score = 0; combo = 0; maxCombo = 0; multiplier = 1; counts = { Perfect: 0, Good: 0, Miss: 0 }; lastJudge = '';
+  bursts = []; popups = []; results = null;
+  lastAttackAt = -1e9; lastMissAt = -1e9; graceUntil = -1e9; cloneAt = -1e9; ringHitAt = [-1e9, -1e9]; ringEmptyAt = [-1e9, -1e9];
+  feverGauge = 0; feverUntil = -1e9; feverCapacity = Math.max(1, notes.length * CONFIG.feverCapacityPerNote);
+  boss = null;
+  if (difficulty === BOSS_RULES.difficulty && chart.sections.length) {
+    const sections = pickBossSections(chart.sections, audioBuffer.duration);
+    const waves = [];
+    for (const sec of sections) {                      // summoned enemies of each section, grouped into waves
+      const list = notes.filter(n => n.time >= sec.start && n.time < sec.end);
+      list.forEach(n => { n.summoned = true; });
+      for (let i = 0; i < list.length; i += BOSS_RULES.waveSize) {
+        const chunk = list.slice(i, i + BOSS_RULES.waveSize);
+        if (chunk.length < BOSS_RULES.waveSize / 2 && waves.length && waves[waves.length - 1].section === sec) waves[waves.length - 1].notes.push(...chunk);
+        else waves.push({ section: sec, notes: chunk, result: null });
+      }
+    }
+    if (waves.length) boss = { def: bossForSong(loadedName), sections, waves, hp: waves.length, maxHp: waves.length, hitAt: -1e9 };
+  }
+  if (demo) { demoMode = true; demoTime = -CONFIG.leadInSec; state = 'demo'; return; }   // attract demo: no audio, select UI stays
+  demoMode = false;
+  source = audioCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(audioCtx.destination);
+  songStart = audioCtx.currentTime + CONFIG.leadInSec;
+  source.start(songStart);
+  state = 'playing';
+  hideOverlay();
+}
+
+function pauseGame() {
+  if (state !== 'playing') return;
+  state = 'paused';
+  audioCtx.suspend();                    // freezes audioCtx.currentTime, so song time freezes with it
+  showPanel('pause');
+}
+
+function resumeGame() {
+  if (state !== 'paused') return;
+  state = 'playing';
+  const st = songTime();
+  for (let i = head; i < notes.length; i++) if (notes[i].state === 3) completeHold(notes[i], st);   // a pause never breaks a hold
+  audioCtx.resume();
+  hideOverlay();
+}
+
+function registerHit(n, j, st) {
+  const fever = feverActive(st);
+  if (fever) j = 'Perfect';                            // during fever every hit in the Good window is Perfect
+  const holding = n.type === 'hold';
+  n.state = holding ? 3 : 1; n.judge = j; n.hitTime = st;
+  n.hitX = (n.type === 'tap' || n.type === 'ghost') ? CHAR_X + (n.time - st) * speed() : (n.type === 'monster' ? MONSTER_PIN_X : CHAR_X);
+  if (holding) n.nextTick = n.time + halfBeatSec();
+  combo++; if (combo > maxCombo) maxCombo = combo;
+  multiplier = comboMultiplier(combo);
+  score += Math.round(SCORE[j] * multiplier * (fever ? CONFIG.feverScoreMult : 1));   // Perfect 100 / Good 50, x combo, x2 in fever
+  counts[j]++; lastJudge = j;
+  if (!fever) {                                        // fever gauge (no gain while fever is running)
+    feverGauge += j === 'Perfect' ? CONFIG.feverGainPerfect : CONFIG.feverGainGood;
+    if (feverGauge >= feverCapacity) { feverGauge = feverCapacity; feverUntil = st + CONFIG.feverBeats * 60 / chart.bpm; }
+  }
+  ringHitAt[n.lane] = st;
+  if (n.lane === 1) cloneAt = st;                      // air hit: the shadow clone attacks at the air position
+  bursts.push({ lane: n.lane, t0: st, color: COLORS[j] });
+  popups.push({ text: onoWord(j), color: LANE_COLORS[n.lane], t0: st, x: CHAR_X + 70, y: LANE_Y[n.lane] - 64, small: j !== 'Perfect' });
+}
+
+function registerMiss(n, st) {
+  n.state = 2; n.judge = 'Miss'; n.hitTime = st;
+  counts.Miss++; combo = 0; multiplier = 1;            // always recorded, combo and multiplier reset
+  missFeedback(n, st);
+}
+
+// Visible Miss feedback, unless inside the grace period.
+function missFeedback(n, st) {
+  if (st < graceUntil) return;                         // inside the grace period: no visual feedback at all
+  lastJudge = 'Miss';
+  lastMissAt = st;                                     // 150ms red flash on the character
+  graceUntil = st + CONFIG.graceSec;
+  popups.push({ text: ONO.miss, color: PALETTE.magenta, fill: PALETTE.paperDim, t0: st, x: CHAR_X + 70, y: LANE_Y[n.lane] - 64, small: true });
+}
+
+// Hold kept to the end (or released within the tolerance): the head judgment stands.
+function completeHold(n, st) {
+  n.state = 1; n.hitTime = st; n.hitX = CHAR_X;
+  ringHitAt[n.lane] = st;
+  bursts.push({ lane: n.lane, t0: st, color: COLORS[n.judge] });
+  popups.push({ text: ONO.hold, color: LANE_COLORS[n.lane], t0: st, x: CHAR_X + 70, y: LANE_Y[n.lane] - 64 });
+}
+
+// Hold released too early: the note becomes a Miss (its head judgment is taken back).
+function breakHold(n, st) {
+  counts[n.judge]--; counts.Miss++;
+  n.judge = 'Miss'; n.state = 2; n.hitTime = st;
+  combo = 0; multiplier = 1;
+  missFeedback(n, st);
+}
+
+// One press on an active monster.
+function mashMonster(n, st) {
+  if (st - n.lastMash < 0.05) return;
+  n.lastMash = st; n.hits++;
+  score += Math.round(CONFIG.mashScore * multiplier * (feverActive(st) ? CONFIG.feverScoreMult : 1));
+  ringHitAt[n.lane] = st;
+  if (n.lane === 1) cloneAt = st;
+  popups.push({ text: ONO.mash, color: LANE_COLORS[n.lane], t0: st, x: MONSTER_PIN_X + 50, y: LANE_Y[n.lane] - 120, small: true });
+  if (n.hits >= n.hitsNeeded) registerHit(n, 'Perfect', st);   // beaten: counts as a Perfect note
+}
+
+// Monster window over without enough hits.
+function resolveMonster(n, st) {
+  if (n.hits >= n.hitsNeeded / 2) registerHit(n, 'Good', st); else registerMiss(n, st);
+}
+
+// Key released on a lane: finishes or breaks the hold on that lane.
+function releaseLane(lane) {
+  if (state !== 'playing') return;
+  const st = songTime();
+  for (let i = head; i < notes.length; i++) {
+    const n = notes[i];
+    if (n.type !== 'hold' || n.lane !== lane || n.state !== 3) continue;
+    if (n.endTime - st <= Math.min(CONFIG.holdReleaseTolerance, n.duration * 0.3)) completeHold(n, st); else breakHold(n, st);
+  }
+}
+
+// Boss waves: once every enemy of a wave is resolved, clearing >= waveClearRatio of it costs the boss 1 HP.
+function evaluateWaves(st) {
+  for (const w of boss.waves) {
+    if (w.result !== null || !w.notes.every(resolved)) continue;
+    const hit = w.notes.filter(n => n.state === 1).length;
+    w.result = hit / w.notes.length >= BOSS_RULES.waveClearRatio;
+    if (w.result) { boss.hp = Math.max(0, boss.hp - 1); boss.hitAt = st; }
+    popups.push({ text: w.result ? 'WAVE CLEARED' : 'WAVE FAILED', color: w.result ? boss.def.color : PALETTE.magenta, t0: st, x: W - 150, y: 130, small: true });
+  }
+}
+
+// Empty press (no enemy in the Good window on that lane): combo/multiplier reset, grey ring flash, not a Miss.
+function registerEmptyPress(lane, st) {
+  if (!DIFFICULTY[difficulty].emptyPenalty) return;
+  combo = 0; multiplier = 1;
+  ringEmptyAt[lane] = st;
+}
+
+// Called from input on F/J. Finds the nearest un-hit enemy on the lane within the Good window.
+function judgePress(lane) {
+  if (state !== 'playing') return;
+  const st = songTime();
+  if (lane === 0) lastAttackAt = st;                   // the real character attacks the ground ring
+  const goodSec = CONFIG.goodMs / 1000;
+  // 1. an active monster on this lane takes every press
+  for (let i = head; i < notes.length && notes[i].time - st <= goodSec; i++) {
+    const n = notes[i];
+    if (n.type === 'monster' && n.lane === lane && n.state === 0 && st >= n.time - goodSec && st <= n.endTime) { mashMonster(n, st); return; }
+  }
+  // 2. nearest un-hit tap / ghost / hold head on the lane within the Good window
+  let best = null, bestDt = Infinity;
+  for (let i = head; i < notes.length; i++) {
+    const n = notes[i];
+    if (n.time - st > goodSec) break;
+    if (n.lane !== lane || n.state !== 0 || n.type === 'monster') continue;
+    const d = Math.abs(n.time - st);
+    if (d < bestDt) { bestDt = d; best = n; }
+  }
+  if (!best) { registerEmptyPress(lane, st); return; }
+  registerHit(best, bestDt <= CONFIG.perfectMs / 1000 ? 'Perfect' : 'Good', st);
+}
+
+// Per-frame state update. Only touches notes inside the visible time window.
+function updateGame(st) {
+  const miss = missSec(), horizon = st + CONFIG.approachTime + 0.5, half = halfBeatSec();
+  const gain = CONFIG.holdTickScore * multiplier * (feverActive(st) ? CONFIG.feverScoreMult : 1);
+  for (let i = head; i < notes.length && notes[i].time < horizon; i++) {
+    const n = notes[i];
+    if (n.state === 0) {
+      if (n.type === 'monster') { if (st > n.endTime) resolveMonster(n, st); }
+      else if (st - n.time > miss) registerMiss(n, st);
+    } else if (n.state === 3) {                        // holding: half-beat ticks, auto-complete at the end
+      if (st >= n.endTime) completeHold(n, st);
+      else while (n.nextTick <= st && n.nextTick < n.endTime) { score += Math.round(gain); n.nextTick += half; }
+    }
+  }
+  while (head < notes.length && resolved(notes[head]) && st - notes[head].endTime > 1.0) head++;
+  if (boss) evaluateWaves(st);
+  if (feverGauge >= feverCapacity && !feverActive(st)) feverGauge = 0;   // fever over: gauge resets and refills
+  if (bursts.length && st - bursts[0].t0 > 0.3) bursts = bursts.filter(r => st - r.t0 <= 0.3);
+  if (popups.length && st - popups[0].t0 > 0.6) popups = popups.filter(p => st - p.t0 <= 0.6);
+  if (st > audioBuffer.duration + 0.3) finishGame();
+}
+
+function finishGame() {
+  stopSource();
+  if (demoMode) { demoMode = false; state = 'select'; lastInputAt = performance.now(); return; }   // demo: nothing is recorded
+  state = 'results';
+  const total = notes.length;
+  const accuracy = total ? (counts.Perfect + 0.5 * counts.Good) / total : 0;
+  const gradeInfo = gradeFor(accuracy, counts.Miss);
+  const prev = loadBest(loadedName, difficulty);
+  const newRecord = !prev || score > prev.score;
+  const bestGrade = prev && gradeRank(prev.grade) > gradeRank(gradeInfo.grade) ? prev.grade : gradeInfo.grade;
+  if (!prev || newRecord || bestGrade !== prev.grade) saveBest(loadedName, difficulty, { score: Math.max(score, prev ? prev.score : 0), grade: bestGrade });
+  const particles = [];
+  for (let i = 0; i < 90; i++) {                       // SSS burst, positions are a pure function of time
+    const a = Math.random() * Math.PI * 2, sp = 160 + Math.random() * 420;
+    particles.push({ vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120, size: 2 + Math.random() * 5, gold: Math.random() < 0.7, life: 0.9 + Math.random() * 0.7 });
+  }
+  const endSt = songTime();
+  for (let i = head; i < notes.length; i++) if (notes[i].state === 3) completeHold(notes[i], endSt);   // song over: holds count as kept
+  let bossResult = null;
+  if (boss) {
+    evaluateWaves(endSt);
+    const defeated = boss.hp <= 0;
+    const col = loadCollection();
+    const rec = col[boss.def.id] || { unlocked: false, defeated: 0, escaped: 0 };
+    rec.unlocked = true;                               // meeting a boss unlocks it; defeating only adds a win
+    if (defeated) rec.defeated++; else rec.escaped++;
+    col[boss.def.id] = rec;
+    saveCollection(col);
+    bossResult = { def: boss.def, defeated };
+  }
+  results = { score, accuracy, gradeInfo, fullCombo: total > 0 && counts.Miss === 0, newRecord, prevBest: prev, particles,
+              improved: !prev || newRecord || gradeRank(gradeInfo.grade) > gradeRank(prev.grade),
+              maxCombo, counts: { ...counts }, boss: bossResult, at: audioCtx.currentTime };
+  showPanel('results');
+}
+
+// =====================================================================
+// (3) RENDERING — "street sticker / printed comic" look. requestAnimationFrame; everything drawn in code.
+//     Every texture / pattern / tile is generated ONCE at init into an offscreen canvas and reused.
+//     Movement is always computed from song time; only pose frames are stepped (every STYLE.poseStepSec).
+// =====================================================================
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const RESULTS_ANIM = { countSec: 1.2, revealSec: 1.35 };
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const wrap = (v, p) => ((v % p) + p) % p;
+const lerp = (a, b, t) => a + (b - a) * clamp01(t);
+const easeOutBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+const rad = d => d * Math.PI / 180;
+const HEAVY_FONT = '"Anton", Impact, "Arial Black", "Helvetica Neue", Arial, sans-serif';
+const HEAVY_W = '400';                       // Anton ships one weight; Impact fallback is heavy anyway
+const MARKER_FONT = '"Rock Salt", "Segoe Print", "Marker Felt", "Comic Sans MS", "Chalkboard SE", cursive';
+const UI_FONT = '"Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif';
+if (document.fonts && document.fonts.load) ['400 20px Anton', '400 20px "Rock Salt"', '700 20px "Space Grotesk"'].forEach(f => document.fonts.load(f).catch(() => {}));
+
+// ---- seeded jitter: rolled once per key on first use and cached, so shapes wobble but never animate ----
+let artSeed = 20240926;
+const artRnd = () => { artSeed = (artSeed * 1664525 + 1013904223) >>> 0; return artSeed / 4294967296; };
+const JITTER = {};
+function jit(key, i) { let a = JITTER[key]; if (!a) a = JITTER[key] = Array.from({ length: 64 }, () => (artRnd() * 2 - 1) * STYLE.jitter); return a[i & 63]; }
+let tintMode = null;                       // set during misregistration copies: everything paints as a flat silhouette in this color
+const poseFrame = clock => Math.floor(clock / STYLE.poseStepSec);   // comic "on twos": pose frames step, movement does not
+
+// Hand-drawn primitives. `v` selects an alternate jitter set (used for the second pencil line).
+function jrr(g, x, y, w, h, r, key, v = '') {
+  const k = key + v, j = i => jit(k, i); r = Math.min(r, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + r + j(0), y + j(1));
+  g.lineTo(x + w - r + j(2), y + j(3)); g.quadraticCurveTo(x + w + j(4), y + j(5), x + w + j(6), y + r + j(7));
+  g.lineTo(x + w + j(8), y + h - r + j(9)); g.quadraticCurveTo(x + w + j(10), y + h + j(11), x + w - r + j(12), y + h + j(13));
+  g.lineTo(x + r + j(14), y + h + j(15)); g.quadraticCurveTo(x + j(16), y + h + j(17), x + j(18), y + h - r + j(19));
+  g.lineTo(x + j(20), y + r + j(21)); g.quadraticCurveTo(x + j(22), y + j(23), x + r + j(24), y + j(25));
+  g.closePath();
+}
+function jcircle(g, cx, cy, r, key, v = '') {
+  const k = key + v, n = 8, pts = [];
+  for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, rr = r * 1.04 + jit(k, i); pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
+  g.beginPath();
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], q = pts[(i + 1) % n], o = pts[(i + n - 1) % n];
+    if (i === 0) g.moveTo((o[0] + p[0]) / 2, (o[1] + p[1]) / 2);
+    g.quadraticCurveTo(p[0], p[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2);
+  }
+  g.closePath();
+}
+function jpoly(g, pts, key, v = '') {
+  const k = key + v;
+  g.beginPath();
+  pts.forEach(([x, y], i) => { const px = x + jit(k, i * 2), py = y + jit(k, i * 2 + 1); i ? g.lineTo(px, py) : g.moveTo(px, py); });
+  g.closePath();
+}
+
+// Sticker: white border outside a 3px ink outline (2px on the light side when `at` gives the shape center),
+// flat fill, optional halftone on the lower-right third (`shade` = radius), and a second 1px pencil line.
+// In tintMode it paints a flat silhouette (misregistration copies).
+function sticker(g, pathFn, fill, o = {}) {
+  const ink = STYLE.inkStroke, inkL = STYLE.inkStrokeLight, paper = STYLE.paperStroke;
+  g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+  if (o.alpha != null) g.globalAlpha *= o.alpha;
+  if (tintMode) { pathFn(g, ''); g.fillStyle = tintMode; g.fill(); g.restore(); return; }     // misregistration copy: flat fill only
+  if (o.fever) { pathFn(g, ''); g.lineWidth = 2 * (ink + paper + STYLE.feverOutline); g.strokeStyle = PALETTE.yellow; g.stroke(); }
+  pathFn(g, ''); g.lineWidth = 2 * (ink + paper); g.strokeStyle = PALETTE.paper; g.stroke();
+  pathFn(g, ''); g.strokeStyle = PALETTE.ink; g.lineWidth = 2 * (o.at ? inkL : ink); g.stroke();
+  if (o.at) {                                                          // heavier line on the shadow (lower-right) side
+    const c = o.at, L = 4000;
+    g.save(); g.beginPath(); g.moveTo(c.x - L, c.y + L); g.lineTo(c.x + L, c.y - L); g.lineTo(c.x + L, c.y + L); g.closePath(); g.clip();
+    pathFn(g, ''); g.lineWidth = 2 * ink; g.stroke(); g.restore();
+  }
+  if (fill) { pathFn(g, ''); g.fillStyle = fill; g.fill(); }
+  if (o.shade && o.at) {                                               // halftone shading material, lower-right third
+    const c = o.at, r = o.shade, d = 0.47 * r, L = 3 * r;
+    g.save(); pathFn(g, ''); g.clip(); g.fillStyle = HALFTONE;
+    g.beginPath(); g.moveTo(c.x + d + L, c.y - L); g.lineTo(c.x - L, c.y + d + L); g.lineTo(c.x + L, c.y + L); g.closePath(); g.fill(); g.restore();
+  }
+  if (o.pencil !== false) {                                            // pencil-and-ink: second thin line, offset, other jitter
+    g.save(); g.translate(STYLE.pencilOffset, STYLE.pencilOffset * 0.7); g.globalAlpha *= STYLE.pencilAlpha;
+    pathFn(g, 'b'); g.lineWidth = STYLE.pencilStroke; g.strokeStyle = PALETTE.ink; g.stroke(); g.restore();
+  }
+  g.restore();
+}
+// Ghost variant: only the off-white border plus a dashed interior line.
+function ghostSticker(g, pathFn, innerPathFn) {
+  g.save(); g.lineJoin = 'round';
+  if (tintMode) { pathFn(g, ''); g.lineWidth = 3; g.strokeStyle = tintMode; g.stroke(); g.restore(); return; }
+  pathFn(g, ''); g.lineWidth = STYLE.paperStroke + 1; g.strokeStyle = PALETTE.paper; g.stroke();
+  g.setLineDash([6, 6]); g.globalAlpha *= 0.7; innerPathFn(g, ''); g.lineWidth = 2; g.stroke();
+  g.restore();
+}
+// The single small diagonal off-white reflection block allowed per object.
+function reflection(g, x, y, w, h) {
+  if (tintMode) return;
+  g.save(); g.translate(x, y); g.rotate(rad(-30)); g.globalAlpha *= 0.75; g.fillStyle = PALETTE.paper; g.fillRect(-w / 2, -h / 2, w, h); g.restore();
+}
+function contactShadow(g, x, y, w) {
+  if (tintMode) return;
+  g.save(); g.globalAlpha *= STYLE.contactShadowAlpha; g.fillStyle = PALETTE.ink;
+  g.beginPath(); g.ellipse(x, y, w / 2, w / 9, 0, 0, Math.PI * 2); g.fill(); g.restore();
+}
+// Heavy skewed comic text: colored offset shadow, ink outline (+ white sticker border), fill.
+function stickerText(g, x, y, text, size, fill, shadowColor, o = {}) {
+  g.save(); g.translate(x, y); if (o.rotate) g.rotate(rad(o.rotate));
+  g.transform(1, 0, -Math.tan(rad(STYLE.textSkewDeg)), 1, 0, 0);
+  g.font = `${HEAVY_W} ${size}px ${HEAVY_FONT}`; g.textAlign = o.align || 'left'; g.textBaseline = 'alphabetic'; g.lineJoin = 'round';
+  if (tintMode) { g.fillStyle = tintMode; g.fillText(text, 0, 0); g.restore(); return; }
+  const ol = STYLE.textOutline, s = STYLE.textShadow;
+  if (o.outline === false) {                                            // ink on paper: no outline, just the offset shadow
+    if (shadowColor) { g.fillStyle = shadowColor; g.fillText(text, s, s); }
+    g.fillStyle = fill; g.fillText(text, 0, 0); g.restore(); return;
+  }
+  if (shadowColor) { g.lineWidth = ol * 2; g.strokeStyle = PALETTE.ink; g.strokeText(text, s, s); g.fillStyle = shadowColor; g.fillText(text, s, s); }
+  if (o.sticker) { g.lineWidth = (ol + STYLE.paperStroke) * 2; g.strokeStyle = PALETTE.paper; g.strokeText(text, 0, 0); }
+  g.lineWidth = ol * 2; g.strokeStyle = PALETTE.ink; g.strokeText(text, 0, 0);
+  g.fillStyle = fill; g.fillText(text, 0, 0);
+  g.restore();
+}
+// Draw something three times: two flat tinted copies offset left/right ('lighter'), then the real thing.
+function misreg(g, active, draw, off = STYLE.misregOffset) {
+  if (active) {
+    g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha *= STYLE.misregAlpha;
+    tintMode = PALETTE.orange; g.translate(-off, 0); draw();
+    tintMode = PALETTE.teal; g.translate(2 * off, 0); draw();
+    tintMode = null; g.restore();
+  }
+  draw();
+}
+const mixHex = (a, b, t) => {
+  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+  return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+};
+
+// =====================================================================
+// Offscreen textures & tiles (built once)
+// =====================================================================
+const TILE_W = 1600, WALL_TOP = 300, ROAD_TOP = FLOOR_Y;
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+const GRAIN_C = (() => {
+  const c = makeCanvas(256, 256), g = c.getContext('2d'), img = g.createImageData(256, 256);
+  for (let i = 0; i < img.data.length; i += 4) { const v = 70 + Math.random() * 160; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0); return c;
+})();
+const HALFTONE_C = (() => {
+  const s = STYLE.halftoneStep, c = makeCanvas(s, s), g = c.getContext('2d');
+  g.globalAlpha = STYLE.halftoneAlpha; g.fillStyle = PALETTE.ink; g.beginPath(); g.arc(s / 2, s / 2, STYLE.halftoneDot / 2, 0, Math.PI * 2); g.fill(); return c;
+})();
+const GRAIN = ctx.createPattern(GRAIN_C, 'repeat');
+const HALFTONE = ctx.createPattern(HALFTONE_C, 'repeat');
+
+// Far: building silhouettes with roll-down shutter doors; halftone on their lower part. Clean lines.
+const FAR = (() => {
+  const c = makeCanvas(TILE_W, WALL_TOP), g = c.getContext('2d'), ht = g.createPattern(HALFTONE_C, 'repeat');
+  for (let i = 0; i < 13; i++) {
+    const x = i * 124 + artRnd() * 30, w = 88 + artRnd() * 50, h = 110 + artRnd() * 150, top = WALL_TOP - h, key = 'bld' + i;
+    g.fillStyle = PALETTE.concreteLight; jrr(g, x, top, w, h + 30, 10, key); g.fill();
+    g.save(); jrr(g, x, top, w, h + 30, 10, key); g.clip(); g.fillStyle = ht; g.fillRect(x, top + h * 0.55, w, h); g.restore();
+    if (artRnd() < 0.7) {
+      const dw = 40 + artRnd() * 30, dx = x + (w - dw) / 2, dy = WALL_TOP - 70;
+      g.fillStyle = PALETTE.concrete; jrr(g, dx, dy, dw, 70, 8, 'door' + i); g.fill();
+      g.strokeStyle = PALETTE.asphalt; g.lineWidth = 2;
+      for (let k = 1; k < 7; k++) { g.beginPath(); g.moveTo(dx + 4, dy + k * 10); g.lineTo(dx + dw - 4, dy + k * 10); g.stroke(); }
+    }
+  }
+  return c;
+})();
+// Wall base: darker concrete with light-concrete blotches.
+const WALL_BASE = (() => {
+  const c = makeCanvas(TILE_W, ROAD_TOP - WALL_TOP), g = c.getContext('2d');
+  g.fillStyle = PALETTE.concrete; g.fillRect(0, 0, c.width, c.height);
+  for (let i = 0; i < 70; i++) {
+    g.globalAlpha = 0.08 + artRnd() * 0.16; g.fillStyle = artRnd() < 0.75 ? PALETTE.concreteLight : PALETTE.asphalt;
+    jcircle(g, artRnd() * c.width, artRnd() * c.height, 20 + artRnd() * 70, 'blot' + i); g.fill();
+  }
+  return c;
+})();
+// Wall stickers: small sticker shapes with white borders, peeling corners and scratches (drawn at full opacity;
+// the frame applies the intensity-driven alpha).
+const WALL_STICKERS = (() => {
+  const c = makeCanvas(TILE_W, ROAD_TOP - WALL_TOP), g = c.getContext('2d');
+  const cols = [PALETTE.orange, PALETTE.teal, PALETTE.paper, PALETTE.concreteLight, PALETTE.magenta, PALETTE.yellow];
+  for (let i = 0; i < 11; i++) {
+    const w = 50 + artRnd() * 90, h = 40 + artRnd() * 70, x = 30 + artRnd() * (c.width - 160), y = 20 + artRnd() * (c.height - 120), rot = (artRnd() - 0.5) * 40;
+    const col = mixHex(cols[i % cols.length], PALETTE.concrete, 0.25), key = 'ws' + i;
+    g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(rad(rot));
+    if (i % 3 === 1) sticker(g, (gg, v) => jcircle(gg, 0, 0, w / 2, key, v), col, { pencil: false });
+    else sticker(g, (gg, v) => jrr(gg, -w / 2, -h / 2, w, h, STYLE.radius, key, v), col, { pencil: false });
+    const fx = w / 2, fy = -h / 2;                                       // peeling corner (top-right)
+    g.fillStyle = PALETTE.concrete; g.beginPath(); g.moveTo(fx - 14, fy); g.lineTo(fx, fy); g.lineTo(fx, fy + 14); g.closePath(); g.fill();
+    sticker(g, (gg, v) => jpoly(gg, [[fx - 14, fy], [fx, fy + 14], [fx - 16, fy + 16]], key + 'p', v), PALETTE.paper, { pencil: false });
+    g.globalAlpha = 0.3; g.strokeStyle = PALETTE.paper; g.lineWidth = 1.5;                       // scratches
+    for (let s = 0; s < 3; s++) { g.beginPath(); g.moveTo(-w / 2 + 10 + s * 14, -h / 4 + jit(key + 's', s) * 4); g.lineTo(-w / 2 + 30 + s * 14, h / 4); g.stroke(); }
+    g.restore();
+  }
+  return c;
+})();
+// Graffiti lettering: 4 large hollow, rounded, overlapping letter-like shapes, two with spray drips.
+const WALL_LETTERS = (() => {
+  const c = makeCanvas(TILE_W, ROAD_TOP - WALL_TOP), g = c.getContext('2d');
+  const forms = [
+    { pts: [[120, 60], [230, 40], [250, 130], [170, 150], [200, 230], [110, 240]], col: PALETTE.orange, drip: true },
+    { pts: [[330, 80], [430, 60], [420, 150], [470, 190], [360, 220], [320, 150]], col: PALETTE.teal, drip: false },
+    { pts: [[900, 50], [1010, 70], [980, 160], [1040, 210], [930, 250], [880, 170]], col: PALETTE.magenta, drip: true },
+    { pts: [[1150, 90], [1260, 80], [1280, 170], [1200, 200], [1230, 250], [1130, 240]], col: PALETTE.paper, drip: false },
+  ];
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  forms.forEach((f, i) => {
+    const col = mixHex(f.col, PALETTE.concrete, 0.3);
+    jpoly(g, f.pts, 'gl' + i); g.lineWidth = 14; g.strokeStyle = col; g.stroke();
+    jpoly(g, f.pts, 'gl' + i); g.lineWidth = 5; g.strokeStyle = PALETTE.concrete; g.stroke();         // hollow
+    if (f.drip) {
+      const [dx, dy] = f.pts[3]; g.strokeStyle = col; g.lineWidth = 9;
+      g.beginPath(); g.moveTo(dx, dy); g.lineTo(dx + jit('gd' + i, 0), dy + 60); g.stroke();
+      g.fillStyle = col; jcircle(g, dx, dy + 66, 8, 'gdb' + i); g.fill();
+    }
+  });
+  return c;
+})();
+const WALL_MAGENTA = (() => {
+  const c = makeCanvas(TILE_W, ROAD_TOP - WALL_TOP), g = c.getContext('2d');
+  [[200, 60, 160, 80, -8], [760, 190, 210, 70, 5], [1300, 40, 120, 130, 12]].forEach(([x, y, w, h, r], i) => {
+    g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(rad(r));
+    sticker(g, (gg, v) => jrr(gg, -w / 2, -h / 2, w, h, STYLE.radius, 'mg' + i, v), PALETTE.magenta, { pencil: false }); g.restore();
+  });
+  return c;
+})();
+// Road: asphalt, curb with a halftone inner edge. Dashes are drawn per frame (they scroll).
+const ROAD = (() => {
+  const c = makeCanvas(W, H - ROAD_TOP), g = c.getContext('2d'), ht = g.createPattern(HALFTONE_C, 'repeat');
+  g.fillStyle = PALETTE.asphalt; g.fillRect(0, 0, c.width, c.height);
+  for (let i = 0; i < 30; i++) { g.globalAlpha = 0.12; g.fillStyle = PALETTE.concrete; jcircle(g, artRnd() * W, 30 + artRnd() * 80, 15 + artRnd() * 40, 'rd' + i); g.fill(); }
+  g.globalAlpha = 1;
+  g.fillStyle = PALETTE.concreteLight; g.fillRect(0, 0, W, 14);
+  g.fillStyle = PALETTE.ink; g.fillRect(0, 14, W, 3);
+  g.fillStyle = ht; g.fillRect(0, 17, W, 22);
+  return c;
+})();
+const VIGNETTE = (() => {
+  const c = makeCanvas(W, H), g = c.getContext('2d');
+  const gr = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85);
+  gr.addColorStop(0, 'rgba(208,57,46,0)'); gr.addColorStop(1, PALETTE.orange);
+  g.fillStyle = gr; g.fillRect(0, 0, W, H); return c;
+})();
+// Song-select page: a photocopied zine spread. Newsprint, toner streaks, darker edges, riso cut-outs (multiply), tape.
+const SELECT_PAGE = (() => {
+  const c = makeCanvas(W, H), g = c.getContext('2d');
+  g.fillStyle = PALETTE.newsprint; g.fillRect(0, 0, W, H);
+  g.fillStyle = PALETTE.ink; g.globalAlpha = 0.05; for (let y = 0; y < H; y += 4) g.fillRect(0, y, W, 1); g.globalAlpha = 1;   // toner streaks
+  const eg = g.createLinearGradient(0, 0, W, 0);
+  eg.addColorStop(0, 'rgba(23,20,15,0.16)'); eg.addColorStop(0.12, 'rgba(23,20,15,0)'); eg.addColorStop(0.88, 'rgba(23,20,15,0)'); eg.addColorStop(1, 'rgba(23,20,15,0.18)');
+  g.fillStyle = eg; g.fillRect(0, 0, W, H);
+  const cut = (x, y, w, h, rot, col, alpha, circle) => {
+    g.save(); g.translate(x + w / 2, y + h / 2); g.rotate(rad(rot)); g.globalCompositeOperation = 'multiply'; g.globalAlpha = alpha; g.fillStyle = col;
+    if (circle) { g.beginPath(); g.arc(0, 0, w / 2, 0, Math.PI * 2); g.fill(); } else g.fillRect(-w / 2, -h / 2, w, h);
+    g.restore();
+  };
+  cut(96, 70, 210, 120, -6, PALETTE.blueInk, 0.9, false);
+  g.save(); g.translate(96 + 105, 70 + 60); g.rotate(rad(-6)); g.fillStyle = 'rgba(246,241,228,0.55)';                  // halftone dots on the blue block
+  for (let yy = -56; yy < 56; yy += 7) for (let xx = -101; xx < 101; xx += 7) { g.beginPath(); g.arc(xx, yy, 1.5, 0, Math.PI * 2); g.fill(); }
+  g.restore();
+  cut(1000, 84, 150, 150, 0, PALETTE.orange, 0.85, true);
+  cut(236, 556, 260, 60, 4, PALETTE.green, 0.8, false);
+  cut(924, 452, 120, 120, -11, PALETTE.yellow, 0.85, false);
+  cut(60, 400, 120, 28, -30, PALETTE.yellow, 0.45, false);                                                              // tape
+  cut(1070, 470, 140, 28, 25, PALETTE.yellow, 0.45, false);
+  g.fillStyle = g.createPattern(GRAIN_C, 'repeat'); g.globalAlpha = 0.1; g.fillRect(0, 0, W, H); g.globalAlpha = 1;    // paper grain
+  return c;
+})();
+const FLASH_C = makeCanvas(W, H), FLASH_G = FLASH_C.getContext('2d');    // for the full-frame misregistration flash
+const SPEED_LINES = Array.from({ length: STYLE.speedLinesFever }, () => ({ x: artRnd() * (W + 400), y: WALL_TOP + 20 + artRnd() * 260, len: 120 + artRnd() * 220 }));
+
+// =====================================================================
+// Background: three parallax layers, intensity- and fever-driven atmosphere
+// =====================================================================
+const scroll = { far: 0, wall: 0, road: 0 };
+let visIntensity = 0.5;                    // smoothed section intensity (transitions ~1s at section boundaries)
+function sectionIntensity(st) {
+  if (!inGame() || !chart) return 0.5;
+  const s = chart.sections.find(sec => st >= sec.start && st < sec.end);
+  return s ? s.intensity : (chart.sections[chart.sections.length - 1] || { intensity: 0.5 }).intensity;
+}
+function tile(g, img, s, y) { const x0 = -wrap(s, TILE_W); g.drawImage(img, x0, y); if (x0 + TILE_W < W) g.drawImage(img, x0 + TILE_W, y); }
+
+function drawBackground(g, st, dt, bpm, fever, bossVis) {
+  visIntensity += (sectionIntensity(st) - visIntensity) * (1 - Math.exp(-dt / STYLE.intensitySmoothSec));
+  const base = 120 * bpm / 60 * lerp(STYLE.scrollSlow, STYLE.scrollFast, visIntensity);    // px/s, tied to BPM and intensity
+  scroll.far += base * 0.2 * dt; scroll.wall += base * 0.5 * dt; scroll.road += base * dt;
+  g.fillStyle = PALETTE.asphalt; g.fillRect(0, 0, W, H);
+  tile(g, FAR, scroll.far, 0);
+  tile(g, WALL_BASE, scroll.wall, WALL_TOP);
+  g.globalAlpha = lerp(STYLE.stickerAlphaMin, STYLE.stickerAlphaMax, visIntensity); tile(g, WALL_STICKERS, scroll.wall, WALL_TOP);
+  g.globalAlpha = STYLE.lettersAlpha; tile(g, WALL_LETTERS, scroll.wall, WALL_TOP);
+  const mag = fever ? STYLE.feverMagentaAlpha : STYLE.magentaAlpha * clamp01((visIntensity - 0.5) / 0.5);
+  if (mag > 0.01) { g.globalAlpha = mag; tile(g, WALL_MAGENTA, scroll.wall, WALL_TOP); }
+  g.globalAlpha = 1;
+  if (fever) { g.globalAlpha = STYLE.feverWashAlpha; g.fillStyle = PALETTE.yellow; g.fillRect(0, WALL_TOP, W, ROAD_TOP - WALL_TOP); g.globalAlpha = 1; }
+  const nLines = fever ? STYLE.speedLinesFever : Math.round(STYLE.speedLinesMax * visIntensity);
+  if (nLines) {
+    g.strokeStyle = PALETTE.paper; g.globalAlpha = 0.4; g.lineWidth = 2; g.lineCap = 'round';
+    for (let i = 0; i < nLines; i++) { const l = SPEED_LINES[i], x = wrap(l.x - scroll.road * 3, W + 400) - 200; g.beginPath(); g.moveTo(x, l.y); g.lineTo(x + l.len, l.y); g.stroke(); }
+    g.globalAlpha = 1;
+  }
+  g.drawImage(ROAD, 0, ROAD_TOP);
+  g.fillStyle = PALETTE.paper; g.globalAlpha = 0.85;
+  const dash = 70, gap = 50, off = wrap(-scroll.road, dash + gap);
+  for (let x = off - dash - gap; x < W; x += dash + gap) { jrr(g, x, ROAD_TOP + 62, dash, 8, 4, 'dash'); g.fill(); }
+  g.globalAlpha = 1;
+  if (bossVis > 0) {                                                     // boss section: darker, spray-orange vignette
+    g.globalAlpha = STYLE.bossDarken * bossVis; g.fillStyle = PALETTE.ink; g.fillRect(0, 0, W, H);
+    g.globalAlpha = STYLE.bossVignetteAlpha * bossVis; g.drawImage(VIGNETTE, 0, 0); g.globalAlpha = 1;
+  }
+}
+
+// =====================================================================
+// Hit rings: segmented off-white ring at the Good radius, thin lane-colored ring at the Perfect radius, center dot.
+// =====================================================================
+function drawArrowGlyph(g, x, y, lane, size) {
+  const d = lane === 0 ? 1 : -1, s = size;
+  sticker(g, (gg, v) => jpoly(gg, [[x - s * 0.18, y - d * s * 0.5], [x + s * 0.18, y - d * s * 0.5], [x + s * 0.18, y + d * s * 0.02], [x + s * 0.48, y + d * s * 0.02],
+                                    [x, y + d * s * 0.55], [x - s * 0.48, y + d * s * 0.02], [x - s * 0.18, y + d * s * 0.02]], 'arrow' + lane, v), LANE_COLORS[lane], { pencil: false });
+}
+function drawRings(g, st, beat, fever) {
+  const phase = wrap(beat, 1), pulse = 1 + 0.05 * Math.max(0, 1 - phase * 3);   // ~5% bump on each beat
+  const rIn = perfectRadius() * pulse, rOut = goodRadius() * pulse, goodSec = CONFIG.goodMs / 1000;
+  const near = [false, false];
+  if (inGame()) for (let i = head; i < notes.length && notes[i].time - st <= goodSec; i++) { const n = notes[i]; if (n.state === 0 && Math.abs(n.time - st) <= goodSec) near[n.lane] = true; }
+  g.save(); g.lineCap = 'round';
+  for (let l = 0; l < 2; l++) {
+    const y = LANE_Y[l], fh = inGame() ? st - ringHitAt[l] : 1, fe = inGame() ? st - ringEmptyAt[l] : 1;
+    if (fh >= 0 && fh < 0.1) { g.globalAlpha = 0.55 * (1 - fh / 0.1); g.fillStyle = LANE_COLORS[l]; g.beginPath(); g.arc(CHAR_X, y, rOut, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+    else if (fe >= 0 && fe < 0.1) { g.globalAlpha = 0.45 * (1 - fe / 0.1); g.fillStyle = PALETTE.paperDim; g.beginPath(); g.arc(CHAR_X, y, rOut, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+    if (fever) { g.strokeStyle = PALETTE.yellow; g.lineWidth = STYLE.feverOutline + 1; g.beginPath(); g.arc(CHAR_X, y, rOut + 8, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = PALETTE.paper; g.globalAlpha = near[l] ? 1 : 0.6; g.lineWidth = STYLE.ringStroke;
+    const n = STYLE.ringSegments, gap = STYLE.ringGap;
+    for (let i = 0; i < n; i++) { g.beginPath(); g.arc(CHAR_X, y, rOut, i / n * Math.PI * 2 + gap / 2, (i + 1) / n * Math.PI * 2 - gap / 2); g.stroke(); }
+    g.strokeStyle = LANE_COLORS[l]; g.globalAlpha = near[l] ? 0.95 : 0.55; g.lineWidth = 2;
+    g.beginPath(); g.arc(CHAR_X, y, rIn, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = 1;
+    sticker(g, (gg, v) => jcircle(gg, CHAR_X, y, STYLE.ringDot, 'dot' + l, v), LANE_COLORS[l], { pencil: false });
+    drawArrowGlyph(g, CHAR_X, y - rOut - 26, l, 26);
+  }
+  g.restore();
+}
+
+// =====================================================================
+// Enemies: attitude faces, wear, halftone, contact shadows, stepped wobble, misregistration on hits / fever
+// =====================================================================
+const WOBBLE = [-3, 0, 3, 0];
+function drawFace(g, x, y, s, v) {
+  if (tintMode) return;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.strokeStyle = PALETTE.ink; g.fillStyle = PALETTE.ink; g.lineWidth = 3; g.lineCap = 'round'; g.lineJoin = 'round';
+  const line = (a, b, c, d) => { g.beginPath(); g.moveTo(a, b); g.lineTo(c, d); g.stroke(); };
+  const dot = (a, b, r) => { g.beginPath(); g.arc(a, b, r, 0, Math.PI * 2); g.fill(); };
+  const smirk = () => { g.beginPath(); g.moveTo(-8, 12); g.quadraticCurveTo(4, 17, 13, 7); g.stroke(); };
+  switch (v % 5) {
+    case 0: line(-16, -8, -4, -4); line(4, -4, 16, -8); smirk(); break;                          // narrowed eyes + smirk
+    case 1: line(-15, -11, -5, -1); line(-5, -11, -15, -1); line(5, -11, 15, -1); line(15, -11, 5, -1);   // X eyes + gritted teeth
+      g.fillStyle = PALETTE.paper; g.fillRect(-13, 7, 26, 9); g.fillStyle = PALETTE.ink; g.strokeRect(-13, 7, 26, 9);
+      line(-6, 7, -6, 16); line(0, 7, 0, 16); line(6, 7, 6, 16); break;
+    case 2: dot(-9, -4, 3.2); dot(10, -4, 3.2); line(-17, -16, -3, -12); line(3, -10, 17, -10); line(-8, 12, 9, 12); break;   // raised eyebrow, flat mouth
+    case 3: dot(-9, -3, 3.2); dot(10, -3, 3.2); line(-17, -14, -4, -8); line(17, -14, 4, -8); smirk(); break;                 // angry brows + smirk
+    default: dot(-9, -4, 3.5); dot(10, -4, 3.5); line(-15, -7, -3, -7); line(4, -7, 16, -7);                                    // half-closed eyes + tongue
+      g.beginPath(); g.arc(2, 9, 6, 0, Math.PI); g.stroke(); g.fillStyle = PALETTE.magenta; g.beginPath(); g.ellipse(4, 14, 4, 5, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
+  g.restore();
+}
+// Sticker wear: one peeling corner (index 0..3) with a lighter underside and 2–3 faint scratches.
+function wear(g, cx, cy, w, h, corner, key) {
+  if (tintMode) return;
+  const sx = corner & 1 ? -1 : 1, sy = corner & 2 ? 1 : -1, fx = cx + sx * w / 2, fy = cy + sy * h / 2;
+  g.save();
+  g.fillStyle = PALETTE.concrete; g.beginPath(); g.moveTo(fx - sx * 13, fy); g.lineTo(fx, fy); g.lineTo(fx, fy + sy * 13); g.closePath(); g.fill();
+  sticker(g, (gg, v) => jpoly(gg, [[fx - sx * 13, fy], [fx, fy + sy * 13], [fx - sx * 15, fy + sy * 15]], key + 'peel', v), PALETTE.paper, { pencil: false });
+  g.globalAlpha *= 0.28; g.strokeStyle = PALETTE.paper; g.lineWidth = 1.5;
+  for (let s = 0; s < 3; s++) { g.beginPath(); g.moveTo(cx - w / 3 + s * 9 + jit(key + 'sc', s), cy - h / 5); g.lineTo(cx - w / 3 + s * 9 + 14, cy + h / 5); g.stroke(); }
+  g.restore();
+}
+function drawGroundEnemy(g, x, y, n, frame, fever) {
+  const rot = rad(WOBBLE[(frame + (n ? n.wob : 0)) & 3]), face = n ? n.face : 0, corner = n ? n.wear : 0;
+  g.save(); g.translate(x, y); g.rotate(rot);
+  if (n && n.type === 'ghost' || (n && n.ghostLook)) { ghostSticker(g, (gg, v) => jrr(gg, -28, -28, 56, 56, 12, 'ge', v), (gg, v) => jrr(gg, -20, -20, 40, 40, 8, 'geI', v)); g.restore(); return; }
+  sticker(g, (gg, v) => jrr(gg, -28, -28, 56, 56, 12, 'ge', v), PALETTE.orange, { at: { x: 0, y: 0 }, shade: 28, fever });
+  wear(g, 0, 0, 56, 56, corner, 'ge');
+  drawFace(g, 0, 0, 1, face);
+  reflection(g, -17, -16, 5, 13);
+  g.restore();
+}
+function drawAirEnemy(g, x, y, n, frame, fever) {
+  const bob = [0, -2, 0, 2][(frame + (n ? n.wob : 0)) & 3], face = n ? n.face : 0;
+  g.save(); g.translate(x, y + bob);
+  if (n && n.type === 'ghost') {
+    ghostSticker(g, (gg, v) => jcircle(gg, 0, -4, 22, 'ae', v), (gg, v) => jcircle(gg, 0, -4, 14, 'aeI', v));
+    if (!tintMode) { g.strokeStyle = PALETTE.paper; g.lineWidth = 2; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(0, 18); g.quadraticCurveTo(10, 30, -4, 44); g.stroke(); }
+    g.restore(); return;
+  }
+  if (!tintMode) { g.strokeStyle = PALETTE.ink; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 20); g.quadraticCurveTo(12, 32, -4 + jit('str', 0), 48); g.stroke();
+    g.strokeStyle = PALETTE.paper; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 20); g.quadraticCurveTo(12, 32, -4 + jit('str', 0), 48); g.stroke(); }
+  sticker(g, (gg, v) => jpoly(gg, [[-6, 14], [6, 14], [0, 23]], 'knot', v), PALETTE.teal, { pencil: false });
+  sticker(g, (gg, v) => jcircle(gg, 0, -4, 22, 'ae', v), PALETTE.teal, { at: { x: 0, y: -4 }, shade: 22, fever });
+  wear(g, 0, -4, 40, 40, n ? n.wear : 0, 'ae');
+  drawFace(g, 0, -6, 0.85, face);
+  reflection(g, -10, -16, 4, 11);
+  g.restore();
+}
+function drawGhostShape(g, x, y, lane, n, frame) { if (lane === 0) drawGroundEnemy(g, x, y, n, frame, false); else drawAirEnemy(g, x, y, n, frame, false); }
+// Mash-monster: big square sticker beast with horns, teeth and an attitude face; damage squints it.
+function drawMonsterShape(g, x, y, lane, damage, rot, n, frame, fever) {
+  const col = LANE_COLORS[lane], wob = rad(WOBBLE[(frame + (n ? n.wob : 0)) & 3] * 0.5);
+  g.save(); g.translate(x, y); g.rotate(rot + wob);
+  sticker(g, (gg, v) => jpoly(gg, [[-30, -40], [-42, -74], [-14, -50]], 'mh1', v), col, { pencil: false });
+  sticker(g, (gg, v) => jpoly(gg, [[30, -40], [42, -74], [14, -50]], 'mh2', v), col, { pencil: false });
+  sticker(g, (gg, v) => jrr(gg, -48, -46, 96, 92, 22, 'mb', v), col, { at: { x: 0, y: 0 }, shade: 48, fever });
+  sticker(g, (gg, v) => jrr(gg, -60, 0, 16, 34, 7, 'ma1', v), col, { pencil: false });
+  sticker(g, (gg, v) => jrr(gg, 44, 0, 16, 34, 7, 'ma2', v), col, { pencil: false });
+  wear(g, 0, 0, 96, 92, n ? n.wear : 0, 'mb');
+  if (!tintMode) {
+    g.save(); g.translate(0, -6); g.scale(1.6 - 0.2 * damage, 1.6 - 0.6 * damage); drawFace(g, 0, 0, 1, n ? n.face : 1); g.restore();
+    g.fillStyle = PALETTE.paper; g.strokeStyle = PALETTE.ink; g.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) { g.fillRect(i * 12 - 4, 26, 8, 12); g.strokeRect(i * 12 - 4, 26, 8, 12); }
+    if (damage > 0.35) { g.strokeStyle = PALETTE.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(24, 30); g.lineTo(32, 14); g.lineTo(28, 2); g.stroke(); }
+  }
+  reflection(g, -30, -28, 6, 20);
+  g.restore();
+}
+function drawEnemyShape(g, x, y, lane, rot, n, frame, fever) {
+  g.save(); g.translate(x, y); g.rotate(rot);
+  if (lane === 0) drawGroundEnemy(g, 0, 0, n, frame, fever); else drawAirEnemy(g, 0, 0, n, frame, fever);
+  g.restore();
+}
+// Visibility of a ghost given the time left until it reaches the ring (fractions of the approach time).
+function ghostAlpha(dt) {
+  const f = dt / CONFIG.approachTime;
+  if (f > 0.55) return 1;
+  if (f > 0.45) return (f - 0.45) / 0.10;
+  if (f > 0.15) return 0;
+  if (f > 0.08) return 1 - (f - 0.08) / 0.07;
+  return 1;
+}
+function drawAura(g, n, x, y) {                     // summoned by the boss: aura in the boss color
+  if (!n.summoned || !boss || tintMode) return;
+  const a0 = g.globalAlpha;
+  g.strokeStyle = boss.def.color; g.lineWidth = 3; g.globalAlpha = a0 * 0.6; g.setLineDash([8, 6]);
+  g.beginPath(); g.arc(x, y, 38, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+  g.globalAlpha = a0;
+}
+function drawHint(g, text, x, y, lane) {            // key hint above an enemy: the lane's arrow, optionally followed by a word
+  if (tintMode) return;
+  const word = text.replace(LANE_KEYS[lane], '').trim();
+  if (!word) { drawArrowGlyph(g, x, y - 8, lane, 20); return; }
+  g.font = `900 20px ${HEAVY_FONT}`; g.textAlign = 'left';
+  const tw = g.measureText(word).width, total = 20 + 8 + tw, x0 = x - total / 2;
+  drawArrowGlyph(g, x0 + 10, y - 8, lane, 20);
+  stickerText(g, x0 + 28, y, word, 20, PALETTE.paper, LANE_COLORS[lane]);
+}
+
+function drawEnemies(g, st, frame, fever) {
+  const sp = speed(), horizon = st + CONFIG.approachTime + 0.5;
+  const showHints = st + CONFIG.leadInSec < CONFIG.hintSec;
+  for (let i = head; i < notes.length && notes[i].time < horizon; i++) {
+    const n = notes[i], y = LANE_Y[n.lane];
+    if (n.state === 1) {                              // hit / beaten: parabola to the upper right, gone in 300ms
+      const e = st - n.hitTime; if (e < 0 || e > 0.3) continue;
+      const fx = n.hitX + 520 * e, fy = y - 700 * e + 1600 * e * e;
+      g.globalAlpha = 1 - e / 0.3;
+      misreg(g, fever || e < STYLE.misregHitSec, () => {
+        if (n.type === 'monster') drawMonsterShape(g, fx, fy, n.lane, 1, e * 8, n, frame, false);
+        else drawEnemyShape(g, fx, fy, n.lane, e * 12, n, frame, false);
+      });
+      g.globalAlpha = 1;
+      continue;
+    }
+    if (n.type === 'hold') drawHold(g, n, st, sp, y, showHints, frame, fever);
+    else if (n.type === 'monster') drawMonster(g, n, st, sp, y, showHints, frame, fever);
+    else {                                            // tap / ghost
+      const x = CHAR_X + (n.time - st) * sp;
+      if (x < -60 || x > W + 60) continue;
+      let alpha = n.state === 2 ? 1 - (st - n.hitTime) / 0.4 : 1;
+      if (n.type === 'ghost' && n.state === 0) alpha *= ghostAlpha(n.time - st);
+      if (alpha <= 0) continue;
+      g.globalAlpha = alpha;
+      if (n.lane === 0) contactShadow(g, x, FLOOR_Y - 2, 56);
+      drawAura(g, n, x, y);
+      misreg(g, fever && n.type !== 'ghost', () => drawEnemyShape(g, x, y, n.lane, 0, n, frame, fever));
+      if (showHints && n.state === 0) drawHint(g, LANE_KEYS[n.lane], x, y - 40, n.lane);
+      g.globalAlpha = 1;
+    }
+  }
+}
+// Hold: head enemy + spray-paint bar to the tail. While holding, the head is pinned at the ring and the bar shrinks.
+function drawHold(g, n, st, sp, y, showHints, frame, fever) {
+  const holding = n.state === 3, hh = STYLE.holdBarHeight;
+  const headX = holding ? CHAR_X : CHAR_X + (n.time - st) * sp, tailX = CHAR_X + (n.endTime - st) * sp;
+  if (tailX < -60 || headX > W + 60) return;
+  const alpha = n.state === 2 ? Math.max(0, 1 - (st - n.hitTime) / 0.4) : 1;
+  if (alpha <= 0) return;
+  g.globalAlpha = alpha;
+  const len = Math.max(0, tailX - headX), col = LANE_COLORS[n.lane];
+  if (n.lane === 0) contactShadow(g, headX, FLOOR_Y - 2, 56);
+  misreg(g, fever, () => {
+    if (!tintMode) { g.save(); g.fillStyle = col; g.globalAlpha *= 0.55;                          // spray speckles along the bar
+      for (let i = 0; i < 22; i++) { const sx = headX + 26 + (i / 22) * (len - 20), sy = y + (i % 2 ? -1 : 1) * (hh / 2 + 4 + Math.abs(jit('spk', i)) * 2); if (sx > tailX - 8) break; g.beginPath(); g.arc(sx, sy, 1.5 + Math.abs(jit('spk', i + 20)) * 0.5, 0, Math.PI * 2); g.fill(); }
+      g.restore(); }
+    sticker(g, (gg, v) => jrr(gg, headX, y - hh / 2, len, hh, hh / 2, 'hold', v), col, { pencil: false, fever: holding && fever, alpha: holding ? 1 : 0.85 });
+    if (!tintMode) { g.strokeStyle = PALETTE.ink; g.lineWidth = 3; g.lineCap = 'round'; g.beginPath(); g.moveTo(tailX - 12, y - hh / 2 - 6); g.lineTo(tailX - 12, y + hh / 2 + 6); g.stroke(); }
+    drawEnemyShape(g, headX, y, n.lane, 0, n, frame, fever);
+  });
+  drawAura(g, n, headX, y);
+  if (showHints && n.state === 0) drawHint(g, LANE_KEYS[n.lane] + ' HOLD', headX + 24, y - 40, n.lane);
+  g.globalAlpha = 1;
+}
+function drawMonster(g, n, st, sp, y, showHints, frame, fever) {
+  const x = st < n.time ? Math.max(MONSTER_PIN_X, CHAR_X + (n.time - st) * sp) : MONSTER_PIN_X;
+  if (x > W + 90) return;
+  const alpha = n.state === 2 ? Math.max(0, 1 - (st - n.hitTime) / 0.4) : 1;
+  if (alpha <= 0) return;
+  const shake = st - n.lastMash < 0.08 ? Math.sin(st * 90) * 5 : 0;
+  g.globalAlpha = alpha;
+  contactShadow(g, x, n.lane === 0 ? FLOOR_Y - 2 : y + 60, 110);
+  drawAura(g, n, x, y);
+  misreg(g, fever || st - n.lastMash < STYLE.misregHitSec, () => drawMonsterShape(g, x + shake, y, n.lane, n.hits / n.hitsNeeded, 0, n, frame, fever));
+  const pipW = 9, gap = 3, total = n.hitsNeeded * (pipW + gap) - gap, x0 = x - total / 2;   // HP pips
+  for (let k = 0; k < n.hitsNeeded; k++) sticker(g, (gg, v) => jrr(gg, x0 + k * (pipW + gap), y - 100, pipW, 8, 3, 'pip' + k, v), k < n.hits ? PALETTE.concrete : LANE_COLORS[n.lane], { pencil: false });
+  if (showHints && n.state === 0) drawHint(g, 'MASH ' + LANE_KEYS[n.lane], x, y - 112, n.lane);
+  g.globalAlpha = 1;
+}
+
+// =====================================================================
+// Character: streetwear skater. pose 'idle' | 'attack' | 'hit'. opts: { tint, alpha, fever, frame }
+// (x, y) = lane position; wheels touch y + 44.
+// =====================================================================
+function drawSkater(g, x, y, pose, o = {}) {
+  const atk = pose === 'attack', hit = pose === 'hit', fr = o.frame || 0;
+  const T = c => o.tint || c, so = { alpha: o.alpha, fever: o.fever, at: { x, y: y - 20 } };
+  const bob = [0, -3, -1, -3][fr & 3], tilt = atk ? -11 : hit ? 4 : [-4, -6, -4, -2][fr & 3];
+  const lean = atk ? 10 : hit ? -12 : -4;         // torso shift: forward twist / recoil / weight on the back foot
+  const skin = T(PALETTE.paper), hoodie = T(PALETTE.concreteLight), pants = T(PALETTE.ink), shoe = T(PALETTE.paper);
+  contactShadow(g, x + 4, y + 46, 100);
+  // skateboard: long thick deck with sticker shapes, trucks and wheels
+  g.save(); g.translate(x, y + 34); g.rotate(rad(tilt));
+  sticker(g, (gg, v) => jrr(gg, -50, -6, 100, 12, 6, 'deck', v), T(PALETTE.teal), so);
+  if (!o.tint && !tintMode) {
+    sticker(g, (gg, v) => jrr(gg, -34, -4, 16, 8, 3, 'ds1', v), PALETTE.orange, { pencil: false });
+    sticker(g, (gg, v) => jcircle(gg, -6, 0, 5, 'ds2', v), PALETTE.magenta, { pencil: false });
+    sticker(g, (gg, v) => jrr(gg, 14, -4, 20, 8, 3, 'ds3', v), PALETTE.paper, { pencil: false });
+  }
+  sticker(g, (gg, v) => jrr(gg, -34, 5, 12, 6, 2, 'tr1', v), T(PALETTE.concreteLight), { pencil: false });
+  sticker(g, (gg, v) => jrr(gg, 22, 5, 12, 6, 2, 'tr2', v), T(PALETTE.concreteLight), { pencil: false });
+  sticker(g, (gg, v) => jcircle(gg, -28, 12, 6, 'wh1', v), shoe, so);
+  sticker(g, (gg, v) => jcircle(gg, 28, 12, 6, 'wh2', v), shoe, so);
+  g.restore();
+  g.save(); g.translate(0, bob);
+  // wide-leg pants + chunky sneakers
+  sticker(g, (gg, v) => jpoly(gg, [[x - 22 + lean * 0.3, y - 2], [x - 4 + lean * 0.3, y - 2], [x - 6, y + 26], [x - 30, y + 26]], 'legB', v), pants, so);
+  sticker(g, (gg, v) => jrr(gg, x - 36, y + 22, 36, 12, 5, 'shoeB', v), shoe, so);
+  sticker(g, (gg, v) => jpoly(gg, [[x + 2 + lean * 0.3, y - 2], [x + 22 + lean * 0.3, y - 2], [x + 30, y + 26], [x + 6, y + 26]], 'legF', v), pants, so);
+  sticker(g, (gg, v) => jrr(gg, x + 4, y + 22, 36, 12, 5, 'shoeF', v), shoe, so);
+  if (!tintMode) { g.strokeStyle = PALETTE.ink; g.lineWidth = 1.5; for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(x - 30 + k * 7, y + 25); g.lineTo(x - 26 + k * 7, y + 29); g.stroke(); g.beginPath(); g.moveTo(x + 10 + k * 7, y + 25); g.lineTo(x + 14 + k * 7, y + 29); g.stroke(); } }
+  // oversized hoodie: flared hem, folds, kangaroo pocket; stretched forward when attacking
+  const st2 = atk ? 14 : 0;
+  sticker(g, (gg, v) => jpoly(gg, [[x - 26 + lean, y - 66], [x + 26 + lean + st2 * 0.5, y - 68], [x + 34 + lean + st2, y - 10], [x + 38 + st2 * 0.6, y + 4], [x - 38, y + 6], [x - 32 + lean * 0.5, y - 12]], 'hoodie', v), hoodie, { ...so, shade: 44 });
+  if (!tintMode) {
+    g.strokeStyle = PALETTE.ink; g.lineWidth = 2; g.lineCap = 'round';
+    [[-14, 1], [0, 0], [16, 1]].forEach(([dx, w2], i) => { g.beginPath(); g.moveTo(x + dx + lean * 0.4, y - 26 + i * 2); g.quadraticCurveTo(x + dx + 3, y - 10, x + dx + jit('fold', i), y + 4); g.stroke(); });   // folds
+    g.beginPath(); g.moveTo(x - 16 + lean * 0.6, y - 30); g.lineTo(x + 16 + lean * 0.6, y - 30); g.lineTo(x + 14 + lean * 0.5, y - 14); g.lineTo(x - 14 + lean * 0.5, y - 14); g.closePath(); g.stroke();   // pocket
+  }
+  sticker(g, (gg, v) => jrr(gg, x - 10 + lean * 0.7, y - 58, 20, 14, 5, 'patch', v), T(PALETTE.orange), { pencil: false });    // chest print
+  // arms
+  if (atk) {
+    sticker(g, (gg, v) => jrr(gg, x + 8 + lean, y - 56, 50, 15, 7, 'armF', v), hoodie, so);
+    sticker(g, (gg, v) => jcircle(gg, x + 62 + lean, y - 48, 9, 'fist', v), skin, so);
+    sticker(g, (gg, v) => jrr(gg, x - 44 + lean * 0.4, y - 52, 15, 32, 7, 'armB', v), hoodie, so);
+  } else if (hit) {
+    sticker(g, (gg, v) => jrr(gg, x - 46 + lean, y - 74, 15, 34, 7, 'armB', v), hoodie, so);
+    sticker(g, (gg, v) => jrr(gg, x + 30 + lean, y - 70, 15, 34, 7, 'armF', v), hoodie, so);
+  } else {
+    sticker(g, (gg, v) => jrr(gg, x - 44 + lean, y - 56, 15, 40, 7, 'armB', v), hoodie, so);
+    sticker(g, (gg, v) => jrr(gg, x + 28 + lean, y - 56, 15, 40, 7, 'armF', v), hoodie, so);
+  }
+  // head: eyes shadowed by the low brim, small sneer
+  const hx = x + lean * 0.9, hy = y - 84;
+  sticker(g, (gg, v) => jcircle(gg, hx, hy, 16, 'head', v), skin, so);
+  if (!tintMode) {
+    g.fillStyle = o.tint ? PALETTE.ink : PALETTE.concreteLight; g.beginPath(); g.moveTo(hx - 15, hy - 4); g.lineTo(hx + 15, hy - 4); g.lineTo(hx + 12, hy + 3); g.lineTo(hx - 12, hy + 3); g.closePath(); g.fill();   // brim shadow
+    g.fillStyle = PALETTE.paper; g.fillRect(hx - 9, hy - 1, 6, 2); g.fillRect(hx + 3, hy - 1, 6, 2);       // eyes as slits in the shadow
+    g.strokeStyle = PALETTE.ink; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(hx - 2, hy + 9); g.lineTo(hx + 7, hy + 7); g.stroke();   // sneer
+  }
+  sticker(g, (gg, v) => jpoly(gg, [[hx - 22, hy - 6], [hx + 22, hy - 6], [hx + 15, hy - 26], [hx - 15, hy - 26]], 'hat', v), T(PALETTE.ink), so);
+  sticker(g, (gg, v) => jrr(gg, hx - 24, hy - 10, 48, 8, 4, 'brim', v), T(PALETTE.orange), so);
+  g.restore();
+}
+
+function drawCharacter(g, st, frame, fever) {
+  const a = inGame() ? st - lastAttackAt : 1;
+  let attackP = a >= 0 && a < 0.1 ? 1 : 0;
+  let airHold = false;
+  if (inGame()) for (let i = head; i < notes.length && notes[i].time <= st; i++) if (notes[i].state === 3) { if (notes[i].lane === 0) attackP = 1; else airHold = true; }
+  const hurt = inGame() && st - lastMissAt >= 0 && st - lastMissAt < 0.15;
+  const grace = inGame() && st < graceUntil;
+  const pose = hurt ? 'hit' : attackP ? 'attack' : 'idle';
+  misreg(g, fever || (a >= 0 && a < STYLE.misregHitSec), () => {
+    if (grace && !tintMode) { g.save(); g.globalAlpha *= 0.6; }
+    drawSkater(g, CHAR_STAND_X, LANE_Y[0], pose, { tint: hurt ? PALETTE.magenta : null, fever, frame });
+    if (grace && !tintMode) { g.restore(); g.save(); g.setLineDash([6, 5]); g.strokeStyle = PALETTE.paper; g.lineWidth = 2; g.globalAlpha *= 0.5; jrr(g, CHAR_STAND_X - 60, LANE_Y[0] - 118, 130, 170, 16, 'graceBox'); g.stroke(); g.restore(); }
+  });
+  const c = inGame() ? st - cloneAt : 1;                                          // air-lane shadow clone
+  if (airHold || (c >= 0 && c < 0.15)) {
+    g.save(); g.globalAlpha *= airHold ? STYLE.cloneAlpha : STYLE.cloneAlpha * Math.min(1, 1.4 * (1 - c / 0.15));
+    misreg(g, fever || (c >= 0 && c < STYLE.misregHitSec), () => drawSkater(g, CHAR_STAND_X, LANE_Y[1], 'attack', { tint: PALETTE.teal, frame }));
+    g.restore();
+  }
+}
+
+// =====================================================================
+// Effects: expanding ring bursts and comic onomatopoeia with radial burst lines
+// =====================================================================
+function drawEffects(g, st, fever) {
+  for (const b of bursts) {
+    const p = (st - b.t0) / 0.3; if (p < 0 || p > 1) continue;
+    g.globalAlpha = 1 - p; g.strokeStyle = b.color; g.lineWidth = 1 + 5 * (1 - p);
+    g.beginPath(); g.arc(CHAR_X, LANE_Y[b.lane], goodRadius() + 60 * p, 0, Math.PI * 2); g.stroke();
+  }
+  g.globalAlpha = 1;
+  for (const p of popups) {
+    const dur = p.small ? 0.4 : 0.6, e = (st - p.t0) / dur; if (e < 0 || e > 1) continue;
+    const scale = (p.small ? 1.15 : 1.5) - 0.5 * Math.min(1, e * 5);
+    g.save(); g.globalAlpha = e < 0.5 ? 1 : 1 - (e - 0.5) * 2; g.translate(p.x, p.y - 40 * e); g.scale(scale, scale);
+    if (!p.small) {                                                               // radial burst behind the word
+      const n = 10; g.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2 + jit('burst', i) * 0.06, r0 = 24 + Math.abs(jit('burst', i + 10)) * 2, r1 = 44 + Math.abs(jit('burst', i + 20)) * 6;
+        g.strokeStyle = PALETTE.ink; g.lineWidth = 5; g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 - 8); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1 - 8); g.stroke();
+        g.strokeStyle = PALETTE.paper; g.lineWidth = 2; g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0 - 8); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1 - 8); g.stroke();
+      }
+    }
+    const size = p.small ? 22 : 36, fill = p.fill || PALETTE.paper;
+    misreg(g, fever && !p.small, () => stickerText(g, 0, 6, p.text, size, fill, p.color, { align: 'center', sticker: true, rotate: -8 }), STYLE.misregTextOffset);
+    g.restore();
+  }
+}
+
+// =====================================================================
+// Bosses (Expert only) — sticker versions of the four bosses, HP bar in highlighter yellow
+// =====================================================================
+const FLOAT = [0, -3, -6, -8, -6, -3];
+function bossPresence(st) {
+  if (!boss) return 0;
+  let vis = 0;
+  for (const sec of boss.sections) {
+    const a = sec.start - CONFIG.approachTime - 0.6, b = sec.end + 0.4;
+    if (st >= a && st <= b + 0.6) vis = Math.max(vis, clamp01(Math.min((st - a) / 0.6, (b + 0.6 - st) / 0.6)));
+  }
+  return vis;
+}
+function drawBossInGame(g, st, frame, vis) {
+  if (vis <= 0) return;
+  const ease = 1 - Math.pow(1 - vis, 3);
+  const x = W - 120 + (1 - ease) * 260, y = 235 + FLOAT[frame % FLOAT.length];
+  contactShadow(g, x, y + 100, 120 * ease);
+  g.save(); g.translate(x, y);
+  drawBoss(g, boss.def, st, null);
+  const f = st - boss.hitAt;
+  if (f >= 0 && f < 0.12) { g.globalAlpha = 0.8 * (1 - f / 0.12); drawBoss(g, boss.def, st, PALETTE.paper); }   // hit flash
+  g.restore();
+  const bw = 420, bx = W / 2 - bw / 2, by = 12;                              // HP bar: one segment per wave
+  g.globalAlpha = ease;
+  const segW = (bw - (boss.maxHp - 1) * 3) / boss.maxHp;
+  for (let k = 0; k < boss.maxHp; k++) sticker(g, (gg, v) => jrr(gg, bx + k * (segW + 3), by, segW, 12, 4, 'hp' + k, v), k < boss.hp ? PALETTE.yellow : PALETTE.concrete, { pencil: false });
+  stickerText(g, bx - 12, by + 12, boss.def.name, 15, PALETTE.yellow, null, { align: 'right' });
+  stickerText(g, bx + bw + 12, by + 12, `HP ${boss.hp}/${boss.maxHp}`, 15, PALETTE.paper, null);
+  g.globalAlpha = 1;
+}
+// Code-drawn boss at the origin (about 160px tall). `override` paints every part in one color
+// (ink = locked silhouette, paper = hit flash). `g` is any 2D context (game canvas or a collection card).
+function drawBoss(g, def, t, override) {
+  const prevTint = tintMode; if (override) tintMode = override;
+  const col = def.color, at = { x: 0, y: 0 };
+  g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+  switch (def.id) {
+    case 'brute': {                                     // horned brute: wide hunched body, horns, teeth
+      sticker(g, (gg, v) => jpoly(gg, [[-34, -30], [-54, -72], [-16, -40]], 'bh1', v), col, { pencil: false });
+      sticker(g, (gg, v) => jpoly(gg, [[34, -30], [54, -72], [16, -40]], 'bh2', v), col, { pencil: false });
+      sticker(g, (gg, v) => jpoly(gg, [[-46, -36], [46, -36], [58, 42], [-58, 42]], 'bb', v), col, { at, shade: 55 });
+      sticker(g, (gg, v) => jrr(gg, -76, -12, 18, 58, 8, 'ba1', v), col, { pencil: false });
+      sticker(g, (gg, v) => jrr(gg, 58, -12, 18, 58, 8, 'ba2', v), col, { pencil: false });
+      if (!tintMode) {
+        g.fillStyle = PALETTE.yellow; g.fillRect(-26, -18, 14, 8); g.fillRect(12, -18, 14, 8);
+        g.strokeStyle = PALETTE.ink; g.lineWidth = 3; g.beginPath(); g.moveTo(-30, -24); g.lineTo(-10, -20); g.moveTo(30, -24); g.lineTo(10, -20); g.stroke();
+        g.fillStyle = PALETTE.paper; for (let i = -3; i <= 3; i++) g.fillRect(i * 10 - 3, 12, 6, 10);
+      }
+      break;
+    }
+    case 'eye': {                                       // floating eye: eyeball with wandering iris, tentacles
+      if (!tintMode) { g.strokeStyle = PALETTE.ink; g.lineWidth = 10; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(i * 14, 36); g.quadraticCurveTo(i * 20 + Math.sin(t * 3 + i) * 8, 62, i * 26 + Math.sin(t * 2 + i) * 10, 84); g.stroke(); } }
+      g.strokeStyle = tintMode || col; g.lineWidth = 6; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(i * 14, 36); g.quadraticCurveTo(i * 20 + Math.sin(t * 3 + i) * 8, 62, i * 26 + Math.sin(t * 2 + i) * 10, 84); g.stroke(); }
+      sticker(g, (gg, v) => jcircle(gg, 0, 0, 46, 'be', v), PALETTE.paper, { at, shade: 46 });
+      const lx = Math.sin(t * 1.3) * 8, ly = Math.cos(t * 0.9) * 5;
+      sticker(g, (gg, v) => jcircle(gg, lx, ly, 24, 'bi', v), col, { pencil: false });
+      if (!tintMode) { g.fillStyle = PALETTE.ink; g.beginPath(); g.arc(lx, ly, 11, 0, Math.PI * 2); g.fill(); g.fillStyle = PALETTE.paper; g.beginPath(); g.arc(lx - 8, ly - 8, 4, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = PALETTE.ink; g.lineWidth = 4; g.beginPath(); g.moveTo(-40, -30); g.quadraticCurveTo(0, -46, 40, -30); g.stroke(); }   // heavy lid
+      break;
+    }
+    case 'serpent': {                                   // serpent: undulating coils, head with tongue
+      for (let i = 0; i < 10; i++) { const x = -76 + i * 14, y = Math.sin(t * 2 + i * 0.7) * 16, r = 8 + i * 1.6; sticker(g, (gg, v) => jcircle(gg, x, y, r, 'sc' + i, v), col, { pencil: false }); }
+      const hx = 72, hy = Math.sin(t * 2 + 7) * 16;
+      sticker(g, (gg, v) => jcircle(gg, hx, hy, 24, 'sh', v), col, { at: { x: hx, y: hy }, shade: 24 });
+      if (!tintMode) {
+        g.fillStyle = PALETTE.yellow; g.beginPath(); g.arc(hx + 8, hy - 6, 5, 0, Math.PI * 2); g.fill(); g.fillStyle = PALETTE.ink; g.beginPath(); g.arc(hx + 9, hy - 6, 2, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = PALETTE.ink; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, hy - 14); g.lineTo(hx + 14, hy - 10); g.stroke();
+        g.strokeStyle = PALETTE.magenta; g.lineWidth = 3; g.beginPath(); g.moveTo(hx + 24, hy + 4); g.lineTo(hx + 42, hy + 4 + Math.sin(t * 8) * 3); g.stroke();
+      }
+      break;
+    }
+    case 'golem': {                                     // crystal golem: hexagon torso, diamond head, orbiting shards
+      const hex = []; for (let i = 0; i < 6; i++) { const a = Math.PI / 3 * i + Math.PI / 6; hex.push([Math.cos(a) * 44, Math.sin(a) * 44 + 10]); }
+      sticker(g, (gg, v) => jpoly(gg, hex, 'gx', v), col, { at, shade: 44 });
+      sticker(g, (gg, v) => jpoly(gg, [[0, -80], [20, -50], [0, -30], [-20, -50]], 'gh', v), col, { pencil: false });
+      sticker(g, (gg, v) => jcircle(gg, 0, 10, 10, 'gc', v), PALETTE.paper, { pencil: false });
+      for (let i = 0; i < 3; i++) { const a = t * 1.5 + i * Math.PI * 2 / 3, x = Math.cos(a) * 74, y = Math.sin(a) * 26 + 10; sticker(g, (gg, v) => jpoly(gg, [[x, y - 12], [x + 7, y], [x, y + 12], [x - 7, y]], 'gs' + i, v), PALETTE.paper, { pencil: false }); }
+      if (!tintMode) { g.strokeStyle = PALETTE.ink; g.lineWidth = 3; g.beginPath(); g.moveTo(-10, -56); g.lineTo(-3, -52); g.moveTo(10, -56); g.lineTo(3, -52); g.stroke(); }
+      break;
+    }
+  }
+  g.restore();
+  tintMode = prevTint;
+}
+
+// =====================================================================
+// HUD
+// =====================================================================
+function drawHUD(g, st, fever) {
+  g.fillStyle = PALETTE.paper; g.fillRect(0, 0, W * clamp01(st / audioBuffer.duration), 3);            // progress line
+  stickerText(g, 26, 60, String(score).padStart(7, '0'), 42, PALETTE.paper, PALETTE.orange);
+  stickerText(g, 28, 82, 'SCORE · ' + difficulty.toUpperCase(), 15, PALETTE.paper, null);
+  if (combo >= 1) {
+    misreg(g, fever, () => stickerText(g, W / 2, 74, String(combo), 60, PALETTE.paper, PALETTE.teal, { align: 'center', rotate: STYLE.comboTilt }), STYLE.misregTextOffset);
+    stickerText(g, W / 2 + 56, 70, '×' + multiplier.toFixed(1), 24, multiplier > 1 ? PALETTE.yellow : PALETTE.paper, PALETTE.teal);
+    stickerText(g, W / 2, 96, 'COMBO', 14, PALETTE.paper, null, { align: 'center' });
+  }
+  if (lastJudge) { stickerText(g, W - 26, 60, lastJudge.toUpperCase(), 28, COLORS[lastJudge], lastJudge === 'Miss' ? PALETTE.ink : PALETTE.orange, { align: 'right' }); stickerText(g, W - 26, 82, 'LAST', 14, PALETTE.paper, null, { align: 'right' }); }
+  // fever gauge
+  const gw = 220, gx = W / 2 - gw / 2, gy = 108;
+  g.save(); g.lineJoin = 'round';
+  jrr(g, gx, gy, gw, 14, 7, 'gauge'); g.fillStyle = PALETTE.concrete; g.fill();
+  g.save(); jrr(g, gx, gy, gw, 14, 7, 'gauge'); g.clip(); g.fillStyle = fever ? PALETTE.yellow : PALETTE.orange; g.fillRect(gx, gy, gw * clamp01(feverGauge / feverCapacity), 14); g.restore();
+  jrr(g, gx, gy, gw, 14, 7, 'gauge'); g.lineWidth = STYLE.inkStroke; g.strokeStyle = PALETTE.ink; g.stroke();
+  g.restore();
+  stickerText(g, gx + gw + 12, gy + 13, 'FEVER', 14, fever ? PALETTE.yellow : PALETTE.paper, null);
+  if (fever) { g.save(); g.translate(W / 2, 168); const k = 1 + 0.1 * Math.sin(st * 12); g.scale(k, k);
+    misreg(g, true, () => stickerText(g, 0, 0, 'FEVER', 40, PALETTE.yellow, PALETTE.magenta, { align: 'center', sticker: true, rotate: -4 }), STYLE.misregTextOffset); g.restore(); }
+  g.globalAlpha = 0.6; stickerText(g, 26, H - 14, '↓ GROUND    ↑ AIR    ESC PAUSE    SPACE RESTART', 13, PALETTE.paper, null); g.globalAlpha = 1;
+}
+
+// =====================================================================
+// Results: torn poster, rubber-stamp grade with reveal animations, FULL COMBO sticker, marker-style best line
+// =====================================================================
+const TEAR = Array.from({ length: 21 }, (_, i) => 8 + Math.abs(jit('tear', i)) * 5 + (i % 2) * 6);
+function posterPath(g, v, x, y, w, h) {
+  g.beginPath(); g.moveTo(x, y + 18);
+  for (let i = 0; i <= 20; i++) g.lineTo(x + i / 20 * w + jit('tearx' + v, i), y + TEAR[i]);
+  g.lineTo(x + w + jit('pe' + v, 0), y + h); g.lineTo(x + jit('pe' + v, 1), y + h + jit('pe' + v, 2)); g.closePath();
+}
+function drawResults(g, t) {
+  const R = results, px = 240, py = 36, pw = 800, ph = 566, cx = W / 2;
+  g.fillStyle = PALETTE.ink; g.globalAlpha = 0.6; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
+  g.save(); g.globalAlpha = 0.25; g.fillStyle = PALETTE.ink; posterPath(g, '', px + 8, py + 8, pw, ph); g.fill(); g.restore();   // hard photocopy shadow
+  sticker(g, (gg, v) => posterPath(gg, v, px, py, pw, ph), PALETTE.paper, { pencil: false });
+  g.save(); posterPath(g, '', px, py, pw, ph); g.clip(); g.fillStyle = HALFTONE; g.fillRect(px + pw - 220, py + ph - 160, 220, 160); g.restore();
+  stickerText(g, cx, py + 62, `RESULTS  ·  ${loadedTitle}  ·  ${difficulty.toUpperCase()}`, 16, PALETTE.concrete, null, { align: 'center', outline: false });
+  const cp = clamp01(t / RESULTS_ANIM.countSec), shown = Math.round(R.score * (1 - Math.pow(1 - cp, 3)));
+  stickerText(g, cx, py + 130, String(shown).padStart(7, '0'), 62, PALETTE.ink, PALETTE.orange, { align: 'center', outline: false });
+  const r = t - RESULTS_ANIM.revealSec;
+  const rows = [['MAX COMBO', R.maxCombo], ['PERFECT', R.counts.Perfect], ['GOOD', R.counts.Good], ['MISS', R.counts.Miss], ['ACCURACY', (R.accuracy * 100).toFixed(1) + '%']];
+  rows.forEach(([label, value], i) => {
+    const yy = py + 200 + i * 44;
+    stickerText(g, px + 70, yy, label, 20, PALETTE.concrete, null, { outline: false });
+    stickerText(g, px + 360, yy, String(value), 28, PALETTE.ink, i === 3 ? PALETTE.magenta : PALETTE.teal, { align: 'right', outline: false });
+  });
+  if (r >= 0) drawGradeStamp(g, R, r, px + 610, py + 300);
+  if (r >= 0) {                                                                  // best line in a hand-marker style
+    g.save(); g.translate(px + 70, py + 440); g.rotate(rad(-1.5)); g.font = `400 17px ${MARKER_FONT}`; g.textAlign = 'left';
+    if (R.newRecord) { g.fillStyle = PALETTE.magenta; g.fillText('★ NEW  RECORD', 0, 0); }
+    else { const d = R.score - R.prevBest.score; g.fillStyle = PALETTE.concrete; g.fillText(`best ${R.prevBest.score}   ${d >= 0 ? '+' : '−'}${Math.abs(d)}`, 0, 0); }
+    g.restore();
+    if (R.boss) {
+      stickerText(g, px + 70, py + 486, (R.boss.defeated ? 'BOSS DEFEATED' : 'THE BOSS ESCAPED') + '  ·  ' + R.boss.def.name, 18, PALETTE.ink, R.boss.defeated ? PALETTE.yellow : PALETTE.magenta, { outline: false });
+      if (R.boss.defeated) { g.save(); g.translate(px + 640, py + 470); const n = 10; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; g.strokeStyle = PALETTE.ink; g.lineWidth = 4; g.beginPath(); g.moveTo(Math.cos(a) * 30, Math.sin(a) * 30); g.lineTo(Math.cos(a) * 50, Math.sin(a) * 50); g.stroke(); } stickerText(g, 0, 12, ONO.ko, 34, PALETTE.yellow, PALETTE.magenta, { align: 'center', sticker: true, rotate: -10 }); g.restore(); }
+    }
+  }
+  if (R.fullCombo && r >= 0.2) {                                                 // FULL COMBO: small diagonal sticker in the corner
+    g.save(); g.translate(px + pw - 110, py + 70); g.rotate(rad(18)); g.globalAlpha = clamp01((r - 0.2) / 0.3);
+    sticker(g, (gg, v) => jrr(gg, -80, -18, 160, 36, 10, 'fc', v), PALETTE.yellow, { pencil: false });
+    stickerText(g, 0, 8, 'FULL COMBO', 20, PALETTE.ink, null, { align: 'center', outline: false }); g.restore();
+  }
+}
+function drawGradeStamp(g, R, r, cx, cy) {
+  const gi = R.gradeInfo, grade = gi.grade, top = grade === 'S' || grade === 'SSS';
+  let alpha = 1, scale = 1;
+  if (grade === 'A') alpha = clamp01(r / 0.5);
+  if (top) scale = r < 0.4 ? easeOutBack(r / 0.4) : 1;
+  if (grade === 'SSS') for (const p of R.particles) {                          // radial burst of paper / yellow flecks
+    if (r > p.life) continue;
+    g.globalAlpha = 1 - r / p.life; g.fillStyle = p.gold ? PALETTE.yellow : PALETTE.paper;
+    g.fillRect(cx + p.vx * r - p.size / 2, cy + p.vy * r + 350 * r * r - p.size / 2, p.size, p.size);
+  }
+  g.globalAlpha = alpha;
+  const draw = () => {
+    g.save(); g.translate(cx, cy); g.rotate(rad(-10)); g.scale(scale, scale);
+    const w = grade === 'SSS' ? 250 : 150, h = 150;
+    g.strokeStyle = tintMode || gi.color; g.lineWidth = 6; g.lineJoin = 'round';
+    jrr(g, -w / 2, -h / 2, w, h, 16, 'stamp'); g.stroke(); g.lineWidth = 2; jrr(g, -w / 2 + 9, -h / 2 + 9, w - 18, h - 18, 12, 'stamp2'); g.stroke();
+    g.font = `${HEAVY_W} ${grade === 'SSS' ? 96 : 116}px ${HEAVY_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.transform(1, 0, -Math.tan(rad(STYLE.textSkewDeg)), 1, 0, 0);
+    g.fillStyle = tintMode || gi.color; g.fillText(grade, 0, 4);
+    g.restore();
+  };
+  misreg(g, grade === 'SSS' && r < 0.35, draw, STYLE.misregTextOffset);
+  g.globalAlpha = 1;
+  if (top && r < 0.6) { const p = r / 0.6; g.globalAlpha = 1 - p; g.strokeStyle = gi.color; g.lineWidth = 6 * (1 - p) + 1; g.beginPath(); g.arc(cx, cy, 90 + 220 * p, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }
+  if (grade === 'SSS' && r < 0.25) { g.globalAlpha = 0.7 * (1 - r / 0.25); g.fillStyle = PALETTE.paper; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+}
+
+// =====================================================================
+// Song select: vinyl carousel (records, sleeves, tonearm). Carousel state lives in block (4).
+// =====================================================================
+const LABEL_COLORS = [PALETTE.orange, PALETTE.blueInk, PALETTE.green, PALETTE.yellow, PALETTE.kraft];   // riso label inks
+const CAR_Y = H * 0.56;
+function slotGeom(i) {
+  const d = i - car.pos, ad = Math.abs(d), R = H * 0.2;                       // centered record: 40% of the canvas height
+  const scale = ad < 1 ? 1 - 0.3 * ad : Math.max(0.5, 0.7 - 0.12 * (ad - 1));
+  const x = W / 2 + Math.sign(d) * (Math.min(ad, 1) * 250 + Math.max(0, ad - 1) * 185);
+  const alpha = ad < 1 ? 1 - 0.25 * ad : Math.max(0.3, 0.75 - 0.2 * (ad - 1));   // lighter fade: cut-outs on paper, not lights in the dark
+  return { x, y: CAR_Y, r: R * scale, scale, alpha, d };
+}
+function fitHeavy(g, text, maxW, size) { g.font = `${HEAVY_W} ${size}px ${HEAVY_FONT}`; while (size > 9 && g.measureText(text).width > maxW) { size -= 1; g.font = `${HEAVY_W} ${size}px ${HEAVY_FONT}`; } return size; }
+
+function drawRecord(g, e, x, y, r, angle, idx) {
+  const lc = LABEL_COLORS[idx % LABEL_COLORS.length], darkLabel = lc === PALETTE.orange || lc === PALETTE.blueInk || lc === PALETTE.green;
+  g.save(); g.translate(x, y);
+  g.save(); g.globalAlpha *= 0.22; g.fillStyle = PALETTE.ink; g.beginPath(); g.arc(8, 9, r + 4, 0, Math.PI * 2); g.fill(); g.restore();   // hard cut-out shadow
+  g.save(); g.rotate(angle);                                                  // everything on the disc turns
+  sticker(g, (gg, v) => jcircle(gg, 0, 0, r, 'disc' + (idx % 3), v), PALETTE.ink, { pencil: false });
+  g.save(); g.strokeStyle = PALETTE.concreteLight; g.globalAlpha *= 0.45; g.lineWidth = 1;
+  for (let rr = r * 0.44; rr < r - 8; rr += 9) { g.beginPath(); g.arc(0, 0, rr, 0, Math.PI * 2); g.stroke(); }
+  g.globalAlpha *= 0.35; g.fillStyle = PALETTE.paper;                          // two matte shine wedges
+  g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r - 6, -0.35, -0.05); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r - 6, Math.PI - 0.35, Math.PI - 0.05); g.closePath(); g.fill();
+  g.restore();
+  sticker(g, (gg, v) => jcircle(gg, 0, 0, r * 0.38, 'label', v), lc, { pencil: false });
+  const sw = r * 0.2, sh = r * 0.11, sx = -r * 0.33, sy = -r * 0.34;           // small sticker on the label, peeling corner
+  sticker(g, (gg, v) => jrr(gg, sx, sy, sw, sh, 4, 'lsticker', v), PALETTE.paper, { pencil: false });
+  g.fillStyle = lc; g.beginPath(); g.moveTo(sx + sw - 7, sy); g.lineTo(sx + sw, sy); g.lineTo(sx + sw, sy + 7); g.closePath(); g.fill();
+  sticker(g, (gg, v) => jpoly(gg, [[sx + sw - 7, sy], [sx + sw, sy + 7], [sx + sw - 8, sy + 8]], 'lpeel', v), PALETTE.paperDim, { pencil: false });
+  g.fillStyle = PALETTE.paper; g.beginPath(); g.arc(0, 0, r * 0.035, 0, Math.PI * 2); g.fill(); g.strokeStyle = PALETTE.ink; g.lineWidth = 2; g.stroke();
+  g.restore();
+  // upright text on the label
+  const maxW = r * 0.66, fill = darkLabel ? PALETTE.paper : PALETTE.ink, shadow = darkLabel ? PALETTE.ink : PALETTE.paper;
+  const ts = fitHeavy(g, e.title, maxW, Math.round(r * 0.13));
+  stickerText(g, 0, -r * 0.06, e.title, ts, fill, shadow, { align: 'center', outline: false });
+  stickerText(g, 0, r * 0.05, e.artist || '', Math.round(r * 0.075), fill, null, { align: 'center', outline: false });
+  const bpm = (chartCache[e.id + '|' + highestUnlocked(e.id, lastDiff)] || {}).bpm || e.bpmHint;
+  if (bpm) stickerText(g, r * 0.2, r * 0.19, `${Math.round(bpm)} BPM`, Math.round(r * 0.07), fill, null, { align: 'center', outline: false });
+  // best grade stamp for the current difficulty (slams in after an improved result)
+  const best = loadBest(e.id, highestUnlocked(e.id, lastDiff));
+  if (best) {
+    const gi = GRADES.find(gr => gr.grade === best.grade) || GRADES[GRADES.length - 1];
+    let k = 1, flash = 0;
+    if (stampSlam && stampSlam.id === e.id) { const p = (performance.now() - stampSlam.at) / 450; if (p < 1) { k = 1 + 1.6 * Math.pow(1 - p, 2); flash = 1 - p; } }
+    g.save(); g.translate(r * 0.5, -r * 0.45); g.rotate(rad(-15)); g.scale(k, k);
+    const w = best.grade === 'SSS' ? r * 0.42 : r * 0.3, h = r * 0.26;
+    g.strokeStyle = gi.color; g.lineWidth = 3; jrr(g, -w / 2, -h / 2, w, h, 5, 'gstamp'); g.stroke();
+    g.font = `${HEAVY_W} ${Math.round(h * 0.7)}px ${HEAVY_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = gi.color;
+    g.transform(1, 0, -Math.tan(rad(STYLE.textSkewDeg)), 1, 0, 0); g.fillText(best.grade, 0, 2);
+    g.restore();
+    if (flash > 0) { g.globalAlpha *= flash; g.strokeStyle = PALETTE.paper; g.lineWidth = 3; g.beginPath(); g.arc(r * 0.5, -r * 0.45, r * 0.25 + (1 - flash) * r * 0.5, 0, Math.PI * 2); g.stroke(); g.globalAlpha /= flash; }
+  }
+  if (e.missing || e.error) {                                                  // remembered-but-missing / fetch failed
+    g.save(); g.translate(0, r * 0.68); g.rotate(rad(-6));
+    sticker(g, (gg, v) => jrr(gg, -r * 0.42, -r * 0.09, r * 0.84, r * 0.18, 6, 'badge', v), PALETTE.magenta, { pencil: false });
+    stickerText(g, 0, r * 0.045, e.kind === 'bundled' ? 'MISSING FILE' : 'RE-UPLOAD', Math.round(r * 0.1), PALETTE.paper, null, { align: 'center', outline: false });
+    g.restore();
+  }
+  g.restore();
+}
+function drawSleeve(g, e, x, y, r, vt) {
+  const upload = e.special === 'upload', side = r * 1.7, col = upload ? PALETTE.kraft : PALETTE.blueInk;
+  g.save(); g.translate(x, y); g.rotate(rad(upload ? -4 : 3));
+  g.fillStyle = PALETTE.ink; g.fillRect(-side / 2 + 9, -side / 2 + 9, side * 0.92, side);                    // hard cut-out shadow
+  g.fillStyle = PALETTE.ink; g.beginPath(); g.arc(side * 0.22, 0, r * 0.8, 0, Math.PI * 2); g.fill();   // disc peeking out
+  g.strokeStyle = PALETTE.paper; g.lineWidth = 2; g.beginPath(); g.arc(side * 0.22, 0, r * 0.8, 0, Math.PI * 2); g.stroke();
+  sticker(g, (gg, v) => jrr(gg, -side / 2, -side / 2, side * 0.92, side, 12, 'sleeve' + e.special, v), col, { at: { x: 0, y: 0 }, shade: side / 2, pencil: false });
+  const fill = upload ? PALETTE.ink : PALETTE.paper;
+  const [l1, l2] = upload ? ['+ UPLOAD', 'YOUR SONG'] : ['✦ GENERATE', 'A SONG'];
+  stickerText(g, -side * 0.04, -r * 0.1, l1, Math.round(r * 0.19), fill, upload ? PALETTE.orange : PALETTE.yellow, { align: 'center', outline: false });
+  stickerText(g, -side * 0.04, r * 0.15, l2, Math.round(r * 0.19), fill, null, { align: 'center', outline: false });
+  stickerText(g, -side * 0.04, r * 0.5, upload ? 'MP3 · WAV · OGG' : 'HOOK: onGenerateSong()', Math.round(r * 0.075), upload ? PALETTE.ink : PALETTE.paper, null, { align: 'center', outline: false });
+  if (!upload) {                                                              // COMING SOON stamp (pulses when activated)
+    const p = (performance.now() - comingSoonAt) / 500, k = p < 1 ? 1 + 0.5 * Math.pow(1 - p, 2) : 1;
+    g.save(); g.translate(-side * 0.04, -r * 0.55); g.rotate(rad(-12)); g.scale(k, k);
+    g.strokeStyle = PALETTE.yellow; g.lineWidth = 4; jrr(g, -r * 0.5, -r * 0.14, r, r * 0.28, 6, 'cs'); g.stroke();
+    stickerText(g, 0, r * 0.06, 'COMING SOON', Math.round(r * 0.14), PALETTE.yellow, null, { align: 'center', outline: false });
+    g.restore();
+  }
+  g.restore();
+}
+function drawTonearm(g, s, resting) {
+  const px = s.x + s.r * 1.02, py = s.y - s.r * 1.02;
+  g.save(); g.translate(px, py); g.rotate(rad(resting ? 0 : -14));
+  const hx = -s.r * 0.30, hy = s.r * 1.07;
+  g.strokeStyle = PALETTE.ink; g.lineWidth = 10; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, 0); g.lineTo(hx, hy); g.stroke();
+  g.strokeStyle = PALETTE.paper; g.lineWidth = 5; g.beginPath(); g.moveTo(0, 0); g.lineTo(hx, hy); g.stroke();
+  sticker(g, (gg, v) => jrr(gg, hx - 10, hy - 6, 24, 14, 4, 'thead', v), PALETTE.ink, { pencil: false });
+  sticker(g, (gg, v) => jcircle(gg, 0, 0, 13, 'tpivot', v), PALETTE.yellow, { pencil: false });
+  g.restore();
+}
+function drawCarousel(g, vt) {
+  const list = cards();
+  const order = list.map((_, i) => i).filter(i => Math.abs(i - car.pos) <= 3.2).sort((a, b) => Math.abs(b - car.pos) - Math.abs(a - car.pos));
+  for (const i of order) {
+    const s = slotGeom(i), e = list[i];
+    g.save(); g.globalAlpha = s.alpha;
+    if (e.kind === 'special') drawSleeve(g, e, s.x, s.y, s.r, vt);
+    else drawRecord(g, e, s.x, s.y, s.r, car.pos * Math.PI + (i === car.to ? car.spin : 0), i);
+    g.restore();
+  }
+  const c = list[car.to];
+  if (c && c.kind !== 'special') { drawTonearm(g, slotGeom(car.to), carSettled()); if (carSettled()) drawSongCard(g, c); }
+  if (!diffOpen && state === 'select') {
+    g.save(); g.globalAlpha = 0.85; g.font = `700 13px ${UI_FONT}`; g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = PALETTE.ink;
+    g.fillText(c.kind === 'special' ? 'TAP · ENTER' : '← →  PICK     ·     TAP · ENTER  TO PLAY', W / 2, CAR_Y + H * 0.2 + 128);
+    g.restore();
+  }
+}
+// Song card under the centered record (Muse Dash style): title, source · BPM, one tag per difficulty.
+// Tags are dashed stamps; the current difficulty is inked solid; locked ones are faded.
+const DIFF_TAG_COLORS = { Easy: PALETTE.green, Normal: PALETTE.blueInk, Hard: PALETTE.orange, Expert: PALETTE.ink };
+function drawSongCard(g, e) {
+  const cur = highestUnlocked(e.id, lastDiff);
+  const bpm = (chartCache[e.id + '|' + cur] || {}).bpm || e.bpmHint;
+  const sub = (e.kind === 'upload' ? 'UPLOAD' : 'BUNDLED') + (bpm ? `  ·  ${Math.round(bpm)} BPM` : '');
+  const titleFont = `${HEAVY_W} 28px ${HEAVY_FONT}`, subFont = `700 12px ${UI_FONT}`, tagFont = `700 12px ${UI_FONT}`;
+  g.save();
+  g.font = titleFont; const tw = g.measureText(e.title).width;
+  g.font = subFont; const sw = g.measureText(sub).width;
+  const leftW = Math.max(tw, sw, 90);
+  g.font = tagFont;
+  const tags = DIFF_ORDER.map(d => { const best = loadBest(e.id, d), locked = !isDiffUnlocked(e.id, d); const text = `${d.toUpperCase()}  ${locked ? 'LOCK' : (best ? best.grade : '—')}`; return { d, text, locked, w: g.measureText(text).width + 22 }; });
+  const tagsW = tags.reduce((a, t) => a + t.w, 0) + 8 * (tags.length - 1);
+  const w = 18 + leftW + 22 + tagsW + 18, h = 62, x = W / 2 - w / 2, y = CAR_Y + H * 0.2 + 34;
+  g.translate(x + w / 2, y + h / 2); g.rotate(rad(-1)); g.translate(-(x + w / 2), -(y + h / 2));
+  g.fillStyle = PALETTE.ink; g.fillRect(x + 5, y + 5, w, h);                                         // hard shadow
+  g.fillStyle = PALETTE.paper; g.fillRect(x, y, w, h);
+  g.lineWidth = 3; g.strokeStyle = PALETTE.ink; g.strokeRect(x, y, w, h);
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.font = titleFont; g.fillStyle = PALETTE.ink; g.fillText(e.title, x + 18, y + 36);
+  g.font = subFont; g.fillStyle = '#6B6355'; g.fillText(sub, x + 18, y + 52);
+  let tx = x + 18 + leftW + 22; g.font = tagFont;
+  for (const t of tags) {
+    const col = DIFF_TAG_COLORS[t.d], sel = t.d === cur, ty = y + 17, th = 28;
+    g.save(); if (t.locked) g.globalAlpha *= 0.35;
+    if (sel) { g.fillStyle = col; g.fillRect(tx, ty, t.w, th); g.fillStyle = col === PALETTE.ink ? PALETTE.yellow : PALETTE.paper; }
+    else { g.setLineDash([4, 3]); g.lineWidth = 2; g.strokeStyle = col; g.strokeRect(tx + 1, ty + 1, t.w - 2, th - 2); g.setLineDash([]); g.fillStyle = col; }
+    g.textAlign = 'center'; g.fillText(t.text, tx + t.w / 2, ty + 18);
+    g.restore();
+    tx += t.w + 8;
+  }
+  g.restore();
+}
+// Marker scribbles on the page margins (drawn per frame so they pick up the web fonts once loaded).
+function drawPageScribbles(g) {
+  g.save(); g.fillStyle = PALETTE.ink; g.textBaseline = 'alphabetic';
+  g.save(); g.translate(130, 250); g.rotate(rad(-5)); g.font = `400 14px ${MARKER_FONT}`; g.textAlign = 'left'; g.fillText('cut here →', 0, 0); g.restore();
+  g.save(); g.translate(905, 118); g.rotate(rad(6)); g.font = `700 12px ${UI_FONT}`; g.textAlign = 'center'; g.fillText('I S S U E   # 0 3   ·   F R E E', 0, 0); g.restore();
+  g.restore();
+}
+
+// =====================================================================
+// Frame composition
+// =====================================================================
+let bossWasVisible = false, bossFlashAt = -1e9, pageAlpha = 1;   // pageAlpha: the zine page fades out for the attract demo
+function render(st, vt, bpm, dt) {
+  const g = ctx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const onSelect = state === 'select' || state === 'analyzing' || state === 'ready' || state === 'demo';
+  const fever = inGame() && feverActive(st);
+  const clock = inGame() ? st : vt, frame = poseFrame(clock);
+  const beat = clock * bpm / 60;
+  const vis = inGame() ? bossPresence(st) : 0;
+  if (state === 'playing') { if (vis > 0 && !bossWasVisible) bossFlashAt = st; bossWasVisible = vis > 0; }
+  drawBackground(g, st, state === 'paused' ? 0 : dt, bpm, fever, vis);
+  drawRings(g, st, beat, fever);
+  if (inGame()) { drawBossInGame(g, st, frame, vis); drawEnemies(g, st, frame, fever); }
+  drawCharacter(g, st, frame, fever);
+  if (inGame()) { drawEffects(g, st, fever); drawHUD(g, st, fever); }
+  if (onSelect) {                                                              // song select: zine page (fades to the scene behind 60% ink for the demo), carousel on top
+    pageAlpha += ((state === 'demo' ? 0 : 1) - pageAlpha) * (1 - Math.exp(-dt / 0.35));
+    g.globalAlpha = 0.6; g.fillStyle = PALETTE.ink; g.fillRect(0, 0, W, H);
+    g.globalAlpha = pageAlpha; g.drawImage(SELECT_PAGE, 0, 0); drawPageScribbles(g); g.globalAlpha = 1;
+    drawCarousel(g, vt);
+  }
+  if (state === 'results' && results) drawResults(g, audioCtx.currentTime - results.at);
+  if (state === 'playing' && st - bossFlashAt >= 0 && st - bossFlashAt < STYLE.bossFlashSec) {   // boss entrance: full-frame misregistration flash
+    const k = 1 - (st - bossFlashAt) / STYLE.bossFlashSec;
+    FLASH_G.globalCompositeOperation = 'source-over'; FLASH_G.globalAlpha = 1; FLASH_G.drawImage(canvas, 0, 0);
+    FLASH_G.globalCompositeOperation = 'source-atop'; FLASH_G.globalAlpha = 0.7; FLASH_G.fillStyle = PALETTE.orange; FLASH_G.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.28 * k; g.drawImage(FLASH_C, -4, 0);
+    FLASH_G.globalCompositeOperation = 'source-over'; FLASH_G.drawImage(canvas, 0, 0);
+    FLASH_G.globalCompositeOperation = 'source-atop'; FLASH_G.fillStyle = PALETTE.teal; FLASH_G.fillRect(0, 0, W, H);
+    g.drawImage(FLASH_C, 4, 0);
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  }
+  g.globalAlpha = STYLE.grainAlpha; g.fillStyle = GRAIN; g.fillRect(0, 0, W, H); g.globalAlpha = 1;   // print grain over everything
+}
+
+let lastTs = performance.now();
+function frame(ts) {
+  const dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000)); lastTs = ts;   // dt: cosmetic scroll / smoothing / demo clock only
+  const vt = audioCtx ? audioCtx.currentTime : ts / 1000;                      // visual clock for idle animation
+  const bpm = chart ? chart.bpm : 120;
+  let st = 0;
+  if (state === 'playing') { st = songTime(); updateGame(st); }
+  else if (state === 'paused') st = songTime();                                // frozen while suspended
+  else if (state === 'demo') { demoTime += dt; st = demoTime; demoAutoplay(st); if (state === 'demo') updateGame(st); }
+  selectTick(dt);
+  render(st, vt, bpm, dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// =====================================================================
+// (4) SONG LIBRARY, SONG SELECT (vinyl carousel), FLOW & INPUT
+// =====================================================================
+
+// ---- Bundled songs: drop the audio files into ./songs/ (relative to index.html) and edit the titles here. ----
+const SONGS = [   // bpmHint: shown on the record before the song has been analyzed (null = show nothing until analyzed)
+  { id: 'belle_u', title: 'BELLE U', artist: 'ARTIST', file: 'songs/belle_U.mp3', bpmHint: null },
+  { id: 'bocci',   title: 'BOCCI',   artist: 'ARTIST', file: 'songs/bocci.mp3',   bpmHint: null },
+  { id: 'metro',   title: 'SPIDERMAN', artist: 'ARTIST', file: 'songs/Metro.mp3', bpmHint: null },   // id/file unchanged: saved scores + bundle still match
+];
+const UPLOADS_KEY = 'rhythmrunner:uploads', LASTDIFF_KEY = 'rhythmrunner:lastDiff', ONBOARD_KEY = 'rhythmrunner:onboarded';
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } };
+
+// Library entries: { id, title, artist, kind: 'bundled' | 'upload', file | fileName, bpmHint, buffer, missing, error }
+const library = SONGS.map(s => ({ ...s, kind: 'bundled', buffer: null, missing: false, error: null }));
+for (const u of lsGet(UPLOADS_KEY, [])) library.push({ id: u.id, title: u.title, artist: 'UPLOAD', fileName: u.fileName, bpmHint: u.bpmHint || null, kind: 'upload', buffer: null, missing: true, error: null });
+const SPECIALS = [
+  { id: '__upload',   kind: 'special', special: 'upload',   title: '+ UPLOAD YOUR SONG' },
+  { id: '__generate', kind: 'special', special: 'generate', title: '✦ GENERATE A SONG' },
+];
+const cards = () => library.concat(SPECIALS);
+const chartCache = {};                 // songId|difficulty -> generated chart (re-selecting is instant)
+const pendingAnalysis = {};
+let analysisQueue = Promise.resolve(); // analyses run one at a time (generateChart reads the global ANALYSIS params)
+let lastDiff = lsGet(LASTDIFF_KEY, 'Normal'); if (!DIFFICULTY[lastDiff]) lastDiff = 'Normal';
+let chosenDiff = lastDiff;
+let diffOpen = false, bossesOpen = false, reuploadTarget = null;
+let stampSlam = null;                  // { id, at }: record whose grade stamp slams in after an improved result
+let comingSoonAt = -1e9;
+
+// Hook for song generation. Called when the "GENERATE A SONG" card is activated. Wire up here later:
+// create / fetch an audio file, then call addSongToLibrary(file) (or build an entry with a decoded buffer).
+function onGenerateSong() {
+  comingSoonAt = performance.now();    // placeholder: the card's COMING SOON stamp pulses
+}
+
+// ---- carousel state (interruptible slide: a new target restarts the 350ms ease from the current position) ----
+const car = { pos: 0, from: 0, to: 0, t0: 0, spin: 0 };
+function setCarTarget(i) {
+  const n = cards().length; i = Math.max(0, Math.min(n - 1, i));
+  if (i === car.to) return;
+  car.from = car.pos; car.to = i; car.t0 = performance.now();
+  refreshSelectUI();
+}
+function carUpdate(dt) {
+  const p = Math.min(1, (performance.now() - car.t0) / 350);
+  car.pos = car.from + (car.to - car.from) * (1 - Math.pow(1 - p, 3));
+  car.spin += dt * Math.PI * 2 / 8;    // the centered record turns once every ~8s
+}
+const centeredCard = () => cards()[car.to];
+const carSettled = () => Math.abs(car.pos - car.to) < 0.01;
+
+// ---- DOM ----
+const overlayEl = document.getElementById('overlay');
+const fileEl = document.getElementById('file');
+const msgEl = document.getElementById('msg');
+const panels = { select: document.getElementById('select'), pause: document.getElementById('pause'), results: document.getElementById('results'), bosses: document.getElementById('bosses') };
+const diffPanel = document.getElementById('diffpanel'), startBtn = document.getElementById('start-btn'), onboardEl = document.getElementById('onboard');
+const diffButtons = Array.from(document.querySelectorAll('.diff-btn'));
+for (const b of diffButtons) if (b.dataset.diff === 'Expert') {           // small boss icon on the Expert pill
+  const c = b.querySelector('canvas'); const g = c.getContext('2d'); g.translate(16, 22); g.scale(0.2, 0.2); drawBoss(g, BOSSES[0], 0, PALETTE.ink);
+}
+
+function showPanel(name) {
+  for (const k in panels) panels[k].classList.toggle('hidden', k !== name);
+  overlayEl.classList.toggle('results', name === 'results');
+  overlayEl.classList.toggle('select', name === 'select');
+  overlayEl.classList.remove('hidden');
+  bossesOpen = name === 'bosses';
+}
+function hideOverlay() { overlayEl.classList.add('hidden'); }
+
+function refreshSelectUI() {
+  const e = centeredCard();
+  const song = e && e.kind !== 'special' ? e : null;
+  document.getElementById('diff-song').textContent = song ? song.title : '';
+  if (song) chosenDiff = highestUnlocked(song.id, chosenDiff);
+  for (const b of diffButtons) {
+    const d = b.dataset.diff, best = song ? loadBest(song.id, d) : null, locked = song ? !isDiffUnlocked(song.id, d) : false;
+    b.querySelector('.dg').textContent = locked ? 'LOCKED' : (best ? best.grade : '—');
+    b.classList.toggle('sel', d === chosenDiff);
+    b.classList.toggle('locked', locked);
+    b.disabled = state === 'analyzing';
+  }
+  diffPanel.classList.toggle('hidden', !diffOpen);
+  startBtn.classList.toggle('hidden', state !== 'ready');
+  onboardEl.classList.toggle('hidden', !!lsGet(ONBOARD_KEY, false));
+}
+
+// ---- loading & analysis ----
+async function loadBuffer(entry) {
+  if (entry.buffer) return entry.buffer;
+  if (entry.kind !== 'bundled') throw new Error('needs upload');
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();   // decoding works while suspended
+  entry.buffer = await audioCtx.decodeAudioData(await fetchSongBytes(entry.file));
+  entry.missing = false; entry.error = null;
+  return entry.buffer;
+}
+// Bytes of a bundled song. fetch() first (http/https); when that is blocked or 404s (double-clicked index.html on
+// file://), load the base64 bundle songs/<file>.js written by tools/bundle_songs.py via a <script> tag.
+async function fetchSongBytes(file) {
+  if (location.protocol !== 'file:') {
+    try { const res = await fetch(file); if (res.ok) return await res.arrayBuffer(); } catch (e) { /* fall back to the bundle */ }
+  }
+  return loadSongBundle(file);
+}
+function loadSongBundle(file) {
+  const name = file.split('/').pop();
+  const unpack = () => {
+    const b64 = (window.SONG_BUNDLE || {})[name];
+    if (!b64) throw new Error('bundle missing: ' + file + '.js');
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for (let i = 0; i < u.length; i++) u[i] = bin.charCodeAt(i);
+    delete window.SONG_BUNDLE[name];                                         // free the base64 copy
+    return u.buffer;
+  };
+  if (window.SONG_BUNDLE && window.SONG_BUNDLE[name]) return Promise.resolve(unpack());
+  return new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = file + '.js';
+    sc.onload = () => { sc.remove(); try { resolve(unpack()); } catch (e) { reject(e); } };
+    sc.onerror = () => { sc.remove(); reject(new Error('bundle missing: ' + file + '.js')); };
+    document.head.appendChild(sc);
+  });
+}
+function analyzeSong(entry, diff, onProgress) {
+  const key = entry.id + '|' + diff;
+  if (chartCache[key]) return Promise.resolve(chartCache[key]);
+  if (pendingAnalysis[key]) return pendingAnalysis[key];
+  const p = analysisQueue.then(async () => {
+    applyDifficulty(diff);                                                                // parameters BEFORE chart generation
+    const c = await generateChart(entry.buffer, onProgress);
+    chartCache[key] = c;
+    if (entry.kind === 'upload' && !entry.bpmHint) { entry.bpmHint = Math.round(c.bpm); persistUploads(); }
+    return c;
+  });
+  pendingAnalysis[key] = p;
+  analysisQueue = p.catch(() => {});
+  p.finally(() => { delete pendingAnalysis[key]; });
+  return p;
+}
+// Loads + analyzes a song for a difficulty and makes it the current chart. silent = background prefetch (no UI, no globals).
+async function prepareSong(entry, diff, silent) {
+  try {
+    await loadBuffer(entry);
+    const cached = !!chartCache[entry.id + '|' + diff];
+    if (!silent && !cached) msgEl.textContent = 'ANALYZING...';
+    const c = await analyzeSong(entry, diff, silent ? null : p => { msgEl.textContent = `ANALYZING... ${Math.round(p * 100)}%`; });
+    if (!silent) { chart = c; audioBuffer = entry.buffer; loadedName = entry.id; loadedTitle = entry.title; msgEl.textContent = `${c.bpm} BPM  ·  ${c.notes.length} enemies`; }
+    return c;
+  } catch (err) {
+    entry.error = entry.kind === 'bundled' ? 'MISSING FILE' : 'RE-UPLOAD';
+    if (!silent) console.log('[songs] could not load', entry.id, String(err));
+    throw err;
+  }
+}
+function persistUploads() { lsSet(UPLOADS_KEY, library.filter(e => e.kind === 'upload').map(e => ({ id: e.id, title: e.title, fileName: e.fileName, bpmHint: e.bpmHint }))); }
+
+// Uploaded file -> library entry (session audio; metadata remembered). Re-uploading a remembered song fills it in.
+async function addSongToLibrary(file) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  let buffer;
+  try { buffer = await audioCtx.decodeAudioData(await file.arrayBuffer()); }
+  catch (err) { console.warn('decode failed', err); msgEl.textContent = 'COULD NOT DECODE THAT FILE'; return null; }
+  const id = 'up:' + file.name;
+  let entry = library.find(e => e.id === id) || (reuploadTarget && reuploadTarget.fileName === file.name ? reuploadTarget : null)
+           || library.find(e => e.kind === 'bundled' && e.file.split('/').pop().toLowerCase() === file.name.toLowerCase());   // bundled song opened from file://
+  if (!entry) {
+    entry = { id, title: file.name.replace(/\.[^.]+$/, '').toUpperCase(), artist: 'UPLOAD', fileName: file.name, bpmHint: null, kind: 'upload', buffer: null, missing: true, error: null };
+    library.push(entry);                                                                  // before the special cards
+  }
+  entry.buffer = buffer; entry.missing = false; entry.error = null;
+  reuploadTarget = null;
+  if (entry.kind === 'upload') persistUploads();
+  car.pos = car.from = car.to = library.indexOf(entry); car.t0 = 0;                        // center it
+  refreshSelectUI();
+  return entry;
+}
+
+// ---- flow ----
+function openDiff() {
+  const e = centeredCard();
+  if (e.kind === 'special') { if (e.special === 'upload') { reuploadTarget = null; fileEl.click(); } else onGenerateSong(); return; }
+  if (e.kind === 'upload' && e.missing) { reuploadTarget = e; fileEl.click(); return; }
+  diffOpen = true; chosenDiff = highestUnlocked(e.id, lastDiff); state = 'select'; msgEl.textContent = '';
+  refreshSelectUI();
+}
+function closeDiff() {
+  diffOpen = false;
+  if (state === 'analyzing' || state === 'ready') state = 'select';
+  refreshSelectUI();
+}
+async function chooseDifficulty(diff) {
+  if (!diffOpen || state === 'analyzing') return;
+  const e = centeredCard();
+  if (!isDiffUnlocked(e.id, diff)) { const u = DIFFICULTY[diff].unlock; msgEl.textContent = `FINISH ${u.after.toUpperCase()} ON THIS SONG TO UNLOCK ${diff.toUpperCase()}`; return; }
+  chosenDiff = diff; lastDiff = diff; lsSet(LASTDIFF_KEY, diff);
+  state = 'analyzing'; refreshSelectUI();
+  try {
+    await prepareSong(e, diff, false);
+    if (!diffOpen || centeredCard() !== e || chosenDiff !== diff) { if (state === 'analyzing') state = 'select'; refreshSelectUI(); return; }
+    applyDifficulty(diff);
+    state = 'ready';
+  } catch (err) {
+    state = 'select';
+    msgEl.textContent = e.kind === 'bundled'
+      ? (location.protocol === 'file:' ? `NO BUNDLE FOR ${e.file.split('/').pop()} — run tools/bundle_songs.py, serve over http, or drag the file onto this window`
+                                        : `FILE NOT FOUND: ${e.file}`)
+      : 'PLEASE RE-UPLOAD THIS SONG';
+  }
+  refreshSelectUI();
+}
+function startFromReady() {
+  if (state !== 'ready') return;
+  applyDifficulty(chosenDiff);
+  ensureAudio();                                                                          // inside the start gesture
+  lsSet(ONBOARD_KEY, true);
+  diffOpen = false;
+  startGame(false);
+}
+function backToSelect() {
+  stopSource();
+  const playedIdx = library.findIndex(e => e.id === loadedName);
+  demoMode = false;
+  if (audioCtx && audioCtx.state === 'suspended' && state !== 'paused') audioCtx.resume();
+  if (results && results.improved && playedIdx >= 0) stampSlam = { id: loadedName, at: performance.now() };
+  state = 'select'; diffOpen = false;
+  if (playedIdx >= 0) { car.pos = car.from = car.to = playedIdx; car.t0 = 0; }
+  bump();
+  showPanel('select');
+  refreshSelectUI();
+}
+// Silent attract demo of the centered song after 6s idle (no audio: the demo clock is cosmetic).
+let lastInputAt = performance.now(), prefetchedFor = null;
+function bump() { lastInputAt = performance.now(); if (state === 'demo') stopDemo(); }
+function startDemo() {
+  const e = centeredCard(), d = highestUnlocked(e.id, lastDiff), c = chartCache[e.id + '|' + d];
+  if (!c || !e.buffer) return;
+  applyDifficulty(d); chart = c; audioBuffer = e.buffer; loadedName = e.id; loadedTitle = e.title;
+  startGame(true);
+}
+function stopDemo() { demoMode = false; state = 'select'; }
+function demoAutoplay(st) {
+  for (let i = head; i < notes.length && notes[i].time <= st; i++) {
+    const n = notes[i];
+    if (n.state !== 0) continue;
+    if (n.type === 'monster') { if (st - n.lastMash >= 0.06) mashMonster(n, st); }
+    else registerHit(n, 'Perfect', st);
+  }
+}
+// Per-frame select-screen housekeeping: carousel motion, idle demo, background prefetch of the centered song.
+function selectTick(dt) {
+  if (!(state === 'select' || state === 'analyzing' || state === 'ready' || state === 'demo')) return;
+  carUpdate(dt);
+  if (state !== 'select' || diffOpen || bossesOpen) return;
+  const idle = performance.now() - lastInputAt, e = centeredCard();
+  if (e.kind === 'special') return;
+  const d = highestUnlocked(e.id, lastDiff);
+  if (idle > 1500 && carSettled() && prefetchedFor !== e.id + '|' + d && !e.error && (e.buffer || e.kind === 'bundled')) {
+    prefetchedFor = e.id + '|' + d;
+    prepareSong(e, d, true).catch(() => {});
+  }
+  if (idle > 6000 && carSettled()) startDemo();
+}
+
+// ---- input ----
+const laneOfKey = code => (code === 'KeyF' || code === 'ArrowDown') ? 0 : (code === 'KeyJ' || code === 'ArrowUp') ? 1 : -1;
+window.addEventListener('keyup', e => {
+  const lane = laneOfKey(e.code);
+  if (lane < 0) return;
+  heldKeys[lane].delete(e.code);
+  if (!heldKeys[lane].size) releaseLane(lane);        // last key of the lane released: hold ends
+});
+window.addEventListener('blur', () => { for (let l = 0; l < 2; l++) { heldKeys[l].clear(); releaseLane(l); } });
+
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const wasDemo = state === 'demo';
+  bump();
+  const onSelect = state === 'select' || state === 'analyzing' || state === 'ready';
+  if (bossesOpen) { if (e.code === 'Escape') { e.preventDefault(); showPanel('select'); refreshSelectUI(); } return; }
+  switch (e.code) {
+    case 'KeyF': case 'ArrowDown': e.preventDefault(); heldKeys[0].add(e.code); if (state === 'playing') judgePress(0); break;
+    case 'KeyJ': case 'ArrowUp':   e.preventDefault(); heldKeys[1].add(e.code); if (state === 'playing') judgePress(1); break;
+    case 'ArrowLeft': case 'ArrowRight': {
+      e.preventDefault();
+      const d = e.code === 'ArrowLeft' ? -1 : 1;
+      if (onSelect && !diffOpen) setCarTarget(car.to + d);
+      else if (diffOpen && state === 'select') {                      // cycle through the unlocked difficulties only
+        const song = centeredCard(); let i = DIFF_ORDER.indexOf(chosenDiff);
+        for (let k = 0; k < DIFF_ORDER.length; k++) { i = (i + d + DIFF_ORDER.length) % DIFF_ORDER.length; if (isDiffUnlocked(song.id, DIFF_ORDER[i])) break; }
+        chosenDiff = DIFF_ORDER[i]; refreshSelectUI();
+      }
+      break;
+    }
+    case 'Enter': case 'Space':
+      e.preventDefault();
+      if (wasDemo) break;
+      if (state === 'select' && !diffOpen) openDiff();
+      else if (state === 'select' && diffOpen) chooseDifficulty(chosenDiff);
+      else if (state === 'ready') startFromReady();
+      else if (state === 'results') { ensureAudio(); startGame(false); }
+      else if (state === 'playing' && e.code === 'Space') { ensureAudio(); startGame(false); }
+      break;
+    case 'Escape':
+      e.preventDefault();
+      if (state === 'playing') pauseGame();
+      else if (state === 'paused') resumeGame();
+      else if (onSelect && diffOpen) closeDiff();
+      break;
+  }
+});
+
+// canvas: click / wheel / touch on the carousel
+function slotAt(px, py) {
+  let best = -1, bestD = Infinity;
+  cards().forEach((_, i) => { const s = slotGeom(i); if (Math.abs(s.d) > 3) return; const d = Math.hypot(px - s.x, py - s.y); if (d <= s.r * 1.05 && d < bestD) { bestD = d; best = i; } });
+  return best;
+}
+canvas.addEventListener('click', e => {
+  const wasDemo = state === 'demo'; bump();
+  if (wasDemo || state !== 'select' || diffOpen || bossesOpen) return;
+  const r = canvas.getBoundingClientRect(), i = slotAt((e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height);
+  if (i < 0) return;
+  if (i === car.to) openDiff(); else setCarTarget(i);
+});
+let wheelAt = 0;
+canvas.addEventListener('wheel', e => {
+  if (!(state === 'select' || state === 'demo') || diffOpen || bossesOpen) return;
+  e.preventDefault(); const wasDemo = state === 'demo'; bump(); if (wasDemo) return;
+  const now = performance.now(); if (now - wheelAt < 140) return; wheelAt = now;
+  const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  if (Math.abs(d) > 2) setCarTarget(car.to + (d > 0 ? 1 : -1));
+}, { passive: false });
+let touchX = null;
+canvas.addEventListener('touchstart', e => { const wasDemo = state === 'demo'; bump(); touchX = wasDemo ? null : e.touches[0].clientX; }, { passive: true });
+canvas.addEventListener('touchend', e => {
+  if (touchX == null) return;
+  const dx = e.changedTouches[0].clientX - touchX; touchX = null;
+  if (state !== 'select' || diffOpen || bossesOpen) return;
+  if (Math.abs(dx) > 40) setCarTarget(car.to + (dx < 0 ? 1 : -1));
+  else { const r = canvas.getBoundingClientRect(), t = e.changedTouches[0], i = slotAt((t.clientX - r.left) * W / r.width, (t.clientY - r.top) * H / r.height); if (i === car.to) openDiff(); else if (i >= 0) setCarTarget(i); }
+}, { passive: true });
+
+// buttons
+document.getElementById('again').addEventListener('click', () => { if (state === 'results') { bump(); ensureAudio(); startGame(false); } });
+document.getElementById('results-title').addEventListener('click', () => { if (state === 'results') backToSelect(); });
+document.getElementById('resume').addEventListener('click', resumeGame);
+document.getElementById('pause-title').addEventListener('click', () => { if (state === 'paused') backToSelect(); });
+document.getElementById('bosses-btn').addEventListener('click', () => { bump(); if (diffOpen) closeDiff(); renderCollection(); showPanel('bosses'); });
+document.getElementById('bosses-back').addEventListener('click', () => { bump(); showPanel('select'); refreshSelectUI(); });
+document.getElementById('diff-close').addEventListener('click', () => { bump(); closeDiff(); });
+startBtn.addEventListener('click', () => { bump(); startFromReady(); });
+for (const btn of diffButtons) btn.addEventListener('click', () => { bump(); chooseDifficulty(btn.dataset.diff); });
+fileEl.addEventListener('change', async () => { bump(); const f = fileEl.files[0]; fileEl.value = ''; if (f) await addSongToLibrary(f); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', async e => { e.preventDefault(); bump(); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) { if (diffOpen) closeDiff(); await addSongToLibrary(f); } });
+
+// Build the 4 boss cards: locked = ink silhouette + "???", unlocked = color + name + defeated / escaped counts.
+function renderCollection() {
+  const col = loadCollection(), wrapEl = document.getElementById('boss-cards');
+  wrapEl.textContent = '';
+  for (const def of BOSSES) {
+    const rec = col[def.id] || { unlocked: false, defeated: 0, escaped: 0 };
+    const card = document.createElement('div'); card.className = 'card' + (rec.unlocked ? '' : ' locked');
+    const cv = document.createElement('canvas'); cv.width = 190; cv.height = 190;
+    const g = cv.getContext('2d'); g.translate(95, 96); drawBoss(g, def, 0, rec.unlocked ? null : PALETTE.ink);
+    const name = document.createElement('div'); name.className = 'name'; name.textContent = rec.unlocked ? def.name : '???';
+    if (rec.unlocked) name.style.color = def.color;
+    const stats = document.createElement('div'); stats.className = 'stats';
+    stats.textContent = rec.unlocked ? `Defeated ×${rec.defeated}   ·   Defeated you ×${rec.escaped}` : '';
+    card.append(cv, name, stats); wrapEl.appendChild(card);
+  }
+}
+
+applyDifficulty(lastDiff);
+state = 'select';
+showPanel('select');
+refreshSelectUI();
+</script>
+</body>
+</html>

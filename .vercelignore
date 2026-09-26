@@ -1,0 +1,8 @@
+# keep the deploy small: only the game, README and the MP3s are needed on https
+songs/*.flac
+songs/*.js
+dist
+tools
+.agents
+ui_options.html
+skills-lock.json

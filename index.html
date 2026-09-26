@@ -49,13 +49,11 @@
   .diff-btn .dg { font-size: 12px; letter-spacing: 1px; opacity: .85; }
   .diff-btn canvas { position: absolute; right: -12px; top: -20px; width: 32px; height: 32px; }
   .diff-btn[data-diff="Easy"]   { color: var(--green); border-color: var(--green); }
-  .diff-btn[data-diff="Normal"] { color: var(--blue); border-color: var(--blue); }
   .diff-btn[data-diff="Hard"]   { color: var(--red); border-color: var(--red); }
   .diff-btn[data-diff="Expert"] { color: var(--ink); border-color: var(--ink); }
   .diff-btn:hover { background: var(--news); transform: translateY(-2px); }
   .diff-btn.sel { border-style: solid; color: var(--paper); box-shadow: 4px 4px 0 var(--ink); transform: rotate(-3deg) scale(1.08); }
   .diff-btn.sel[data-diff="Easy"]   { background: var(--green); }
-  .diff-btn.sel[data-diff="Normal"] { background: var(--blue); }
   .diff-btn.sel[data-diff="Hard"]   { background: var(--red); }
   .diff-btn.sel[data-diff="Expert"] { background: var(--ink); color: var(--yellow); box-shadow: 4px 4px 0 var(--yellow); }
   .diff-btn.locked { opacity: .35; }
@@ -112,7 +110,6 @@
         <div id="diff-song"></div>
         <div id="difficulty">
           <button class="diff-btn" data-diff="Easy"><span class="dn">EASY</span><span class="dg">—</span></button>
-          <button class="diff-btn" data-diff="Normal"><span class="dn">NORMAL</span><span class="dg">—</span></button>
           <button class="diff-btn" data-diff="Hard"><span class="dn">HARD</span><span class="dg">—</span></button>
           <button class="diff-btn" data-diff="Expert"><canvas width="32" height="32"></canvas><span class="dn">EXPERT</span><span class="dg">—</span></button>
         </div>
@@ -571,7 +568,6 @@ const CONFIG = {
 // holdFrac / ghostFrac / monsterEverySec: how many holds and ghosts, and how often a mash-monster appears.
 const DIFFICULTY = {
   Easy:   { peakK: 1.30, maxPerSecond: 3, doubleTopFrac: 0.00, perfectMs: 80, goodMs: 160, emptyPenalty: false, holdFrac: 0.35, ghostFrac: 0.00, monsterEverySec: 30 },
-  Normal: { peakK: 1.25, maxPerSecond: 3, doubleTopFrac: 0.03, perfectMs: 60, goodMs: 140, emptyPenalty: true,  holdFrac: 0.35, ghostFrac: 0.05, monsterEverySec: 30 },
   Hard:   { peakK: 0.95, maxPerSecond: 6, doubleTopFrac: 0.08, perfectMs: 50, goodMs: 120, emptyPenalty: true,  holdFrac: 0.45, ghostFrac: 0.20, monsterEverySec: 20 },
   Expert: { peakK: 0.70, maxPerSecond: 8, doubleTopFrac: 0.10, perfectMs: 50, goodMs: 120, emptyPenalty: true,  holdFrac: 0.50, ghostFrac: 0.30, monsterEverySec: 18,
             unlock: { after: 'Hard', minGrade: 'C' } },   // per song: finish Hard on that song (any grade) to unlock Expert
@@ -589,7 +585,7 @@ function highestUnlocked(songId, wanted) {            // wanted if unlocked, els
   for (let i = DIFF_ORDER.indexOf(wanted) - 1; i >= 0; i--) if (isDiffUnlocked(songId, DIFF_ORDER[i])) return DIFF_ORDER[i];
   return DIFF_ORDER[0];
 }
-let difficulty = 'Normal';
+let difficulty = 'Easy';
 function applyDifficulty(name) {
   const d = DIFFICULTY[name];
   difficulty = name;
@@ -686,7 +682,7 @@ const comboMultiplier = c => Math.min(2.0, 1 + 0.1 * Math.floor(c / 20));   // +
 const missSec = () => Math.max(CONFIG.missMs, CONFIG.goodMs) / 1000;
 
 let audioCtx = null, audioBuffer = null, chart = null, source = null, loadedName = '', loadedTitle = '';   // loadedName = song id (storage key)
-let demoMode = false, demoTime = 0;      // silent attract demo on the song-select screen (cosmetic clock, no audio)
+let demoMode = false, demoTime = 0, demoAudio = false;   // attract demo on the song-select screen; plays the song when the browser already allows audio
 let state = 'select';                    // select | analyzing | ready | demo | playing | paused | results
 let songStart = 0;                       // audioCtx.currentTime at which song time 0 is played
 let notes = [], head = 0;                // runtime notes sorted by time; head = first note still worth looking at
@@ -732,7 +728,7 @@ function stopSource() {
 }
 
 function startGame(demo = false) {
-  stopSource();
+  stopSource(); if (!demo) stopPreview();
   if (!demo) ensureAudio();
   notes = chart.notes.map(n => ({
     time: n.time, lane: n.lane, type: n.type || 'tap', duration: n.duration || 0, endTime: n.time + (n.duration || 0),
@@ -759,7 +755,15 @@ function startGame(demo = false) {
     }
     if (waves.length) boss = { def: bossForSong(loadedName), sections, waves, hp: waves.length, maxHp: waves.length, hitAt: -1e9 };
   }
-  if (demo) { demoMode = true; demoTime = -CONFIG.leadInSec; state = 'demo'; return; }   // attract demo: no audio, select UI stays
+  if (demo) {                                                                            // attract demo: select UI stays
+    demoMode = true; demoTime = -CONFIG.leadInSec; state = 'demo'; demoAudio = false;
+    if (audioCtx && audioCtx.state === 'running') {                                     // audio allowed: the demo plays its song, clock follows the audio
+      stopPreview();
+      source = audioCtx.createBufferSource(); source.buffer = audioBuffer; source.connect(audioCtx.destination);
+      songStart = audioCtx.currentTime + CONFIG.leadInSec; source.start(songStart); demoAudio = true;
+    }
+    return;
+  }
   demoMode = false;
   source = audioCtx.createBufferSource();
   source.buffer = audioBuffer;
@@ -1912,7 +1916,7 @@ function drawCarousel(g, vt) {
 }
 // Song card under the centered record (Muse Dash style): title, source · BPM, one tag per difficulty.
 // Tags are dashed stamps; the current difficulty is inked solid; locked ones are faded.
-const DIFF_TAG_COLORS = { Easy: PALETTE.green, Normal: PALETTE.blueInk, Hard: PALETTE.orange, Expert: PALETTE.ink };
+const DIFF_TAG_COLORS = { Easy: PALETTE.green, Hard: PALETTE.orange, Expert: PALETTE.ink };
 function drawSongCard(g, e) {
   const cur = highestUnlocked(e.id, lastDiff);
   const bpm = (chartCache[e.id + '|' + cur] || {}).bpm || e.bpmHint;
@@ -2004,7 +2008,7 @@ function frame(ts) {
   let st = 0;
   if (state === 'playing') { st = songTime(); updateGame(st); }
   else if (state === 'paused') st = songTime();                                // frozen while suspended
-  else if (state === 'demo') { demoTime += dt; st = demoTime; demoAutoplay(st); if (state === 'demo') updateGame(st); }
+  else if (state === 'demo') { if (demoAudio) demoTime = audioCtx.currentTime - songStart - CONFIG.audioOffset / 1000; else demoTime += dt; st = demoTime; demoAutoplay(st); if (state === 'demo') updateGame(st); }
   selectTick(dt);
   render(st, vt, bpm, dt);
   requestAnimationFrame(frame);
@@ -2036,7 +2040,7 @@ const cards = () => library.concat(SPECIALS);
 const chartCache = {};                 // songId|difficulty -> generated chart (re-selecting is instant)
 const pendingAnalysis = {};
 let analysisQueue = Promise.resolve(); // analyses run one at a time (generateChart reads the global ANALYSIS params)
-let lastDiff = lsGet(LASTDIFF_KEY, 'Normal'); if (!DIFFICULTY[lastDiff]) lastDiff = 'Normal';
+let lastDiff = lsGet(LASTDIFF_KEY, 'Easy'); if (!DIFFICULTY[lastDiff]) lastDiff = 'Easy';   // a remembered 'Normal' (removed) falls back to Easy
 let chosenDiff = lastDiff;
 let diffOpen = false, bossesOpen = false, reuploadTarget = null;
 let stampSlam = null;                  // { id, at }: record whose grade stamp slams in after an improved result
@@ -2253,7 +2257,7 @@ function startDemo() {
   applyDifficulty(d); chart = c; audioBuffer = e.buffer; loadedName = e.id; loadedTitle = e.title;
   startGame(true);
 }
-function stopDemo() { demoMode = false; state = 'select'; }
+function stopDemo() { stopSource(); demoMode = false; demoAudio = false; state = 'select'; }
 function demoAutoplay(st) {
   for (let i = head; i < notes.length && notes[i].time <= st; i++) {
     const n = notes[i];
@@ -2262,10 +2266,47 @@ function demoAutoplay(st) {
     else registerHit(n, 'Perfect', st);
   }
 }
-// Per-frame select-screen housekeeping: carousel motion, idle demo, background prefetch of the centered song.
+// ---- song preview: the centered record plays (looped from its loudest section) as soon as the browser allows audio ----
+const PREVIEW = { fadeInSec: 0.8, fadeOutSec: 0.35, gain: 0.9, fallbackOffsetFrac: 0.25 };
+let preview = null;                    // { id, source, gain }
+function previewOffset(e) {
+  const c = chartCache[e.id + '|' + highestUnlocked(e.id, lastDiff)];
+  if (c && c.sections.length) { const sec = c.sections.reduce((a, b) => b.intensity > a.intensity ? b : a); return Math.min(sec.start, Math.max(0, e.buffer.duration - 10)); }
+  return e.buffer.duration * PREVIEW.fallbackOffsetFrac;
+}
+function startPreview(e) {
+  stopPreview();
+  const g = audioCtx.createGain(), src = audioCtx.createBufferSource();
+  src.buffer = e.buffer; src.loop = true; src.loopStart = previewOffset(e); src.loopEnd = e.buffer.duration;
+  src.connect(g); g.connect(audioCtx.destination);
+  const now = audioCtx.currentTime; g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(PREVIEW.gain, now + PREVIEW.fadeInSec);
+  src.start(now, src.loopStart);
+  preview = { id: e.id, source: src, gain: g };
+}
+function stopPreview() {
+  if (!preview) return;
+  const { source: src, gain: g } = preview; preview = null;
+  const now = audioCtx.currentTime; g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(g.gain.value, now); g.gain.linearRampToValueAtTime(0, now + PREVIEW.fadeOutSec);
+  setTimeout(() => { try { src.stop(); } catch (err) { /* already stopped */ } src.disconnect(); g.disconnect(); }, PREVIEW.fadeOutSec * 1000 + 50);
+}
+function previewTick() {
+  const e = centeredCard(), ok = audioCtx && audioCtx.state === 'running';
+  const target = e.kind !== 'special' && e.buffer ? e : null;
+  if (preview && (!ok || !target || preview.id !== target.id)) stopPreview();          // moved away: fade out during the slide
+  if (!ok || !carSettled()) return;
+  if (!target && e.kind === 'bundled' && !e.buffer && !e.error && !e.loading) {           // fetch the audio right away (analysis comes later)
+    e.loading = true; loadBuffer(e).catch(() => { e.error = 'MISSING FILE'; }).finally(() => { e.loading = false; });
+  }
+  if (target && !preview) startPreview(target);
+}
+// Browsers only let audio start after a user gesture: unlock on the first one (not while paused, which keeps the context suspended on purpose).
+for (const t of ['pointerdown', 'keydown', 'touchend']) window.addEventListener(t, () => { if (state !== 'paused') ensureAudio(); }, { capture: true, passive: true });
+
+// Per-frame select-screen housekeeping: carousel motion, preview, idle demo, background prefetch of the centered song.
 function selectTick(dt) {
   if (!(state === 'select' || state === 'analyzing' || state === 'ready' || state === 'demo')) return;
   carUpdate(dt);
+  if (state !== 'demo') previewTick();
   if (state !== 'select' || diffOpen || bossesOpen) return;
   const idle = performance.now() - lastInputAt, e = centeredCard();
   if (e.kind === 'special') return;

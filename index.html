@@ -1717,7 +1717,17 @@ function drawHUD(g, st, fever) {
   stickerText(g, gx + gw + 12, gy + 13, 'FEVER', 14, fever ? PALETTE.yellow : PALETTE.paper, null);
   if (fever) { g.save(); g.translate(W / 2, 168); const k = 1 + 0.1 * Math.sin(st * 12); g.scale(k, k);
     misreg(g, true, () => stickerText(g, 0, 0, 'FEVER', 40, PALETTE.yellow, PALETTE.magenta, { align: 'center', sticker: true, rotate: -4 }), STYLE.misregTextOffset); g.restore(); }
-  g.globalAlpha = 0.6; stickerText(g, 26, H - 14, '↓ GROUND    ↑ AIR    ESC PAUSE    SPACE RESTART', 13, PALETTE.paper, null); g.globalAlpha = 1;
+  if (IS_TOUCH) {                                                            // phone: tap zones and a pause sticker
+    for (let l = 0; l < 2; l++) {
+      const held = heldKeys[l].size > 0;
+      g.globalAlpha = held ? 0.45 : 0.18; g.fillStyle = LANE_COLORS[l];
+      jrr(g, l ? W / 2 + 12 : 12, H - 150, W / 2 - 24, 138, 22, 'pad' + l); g.fill();
+      g.globalAlpha = 0.9; drawArrowGlyph(g, l ? W * 0.75 : W * 0.25, H - 82, l, 60);
+    }
+    g.globalAlpha = 1;
+    sticker(g, (gg, v) => jrr(gg, W - 96, 90, 72, 44, 10, 'pausebtn', v), PALETTE.paper, { pencil: false });
+    stickerText(g, W - 60, 121, 'II', 26, PALETTE.ink, null, { align: 'center', outline: false });
+  } else { g.globalAlpha = 0.6; stickerText(g, 26, H - 14, '↓ GROUND    ↑ AIR    ESC PAUSE    SPACE RESTART', 13, PALETTE.paper, null); g.globalAlpha = 1; }
 }
 
 // =====================================================================
@@ -2336,9 +2346,32 @@ canvas.addEventListener('wheel', e => {
   const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   if (Math.abs(d) > 2) setCarTarget(car.to + (d > 0 ? 1 : -1));
 }, { passive: false });
+const IS_TOUCH = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 let touchX = null;
-canvas.addEventListener('touchstart', e => { const wasDemo = state === 'demo'; bump(); touchX = wasDemo ? null : e.touches[0].clientX; }, { passive: true });
+const touchLanes = new Map();                          // touch identifier -> lane held (gameplay tap zones)
+const canvasPoint = t => { const r = canvas.getBoundingClientRect(); return [(t.clientX - r.left) * W / r.width, (t.clientY - r.top) * H / r.height]; };
+canvas.addEventListener('touchstart', e => {
+  if (state === 'playing') {                            // left half = ground (↓), right half = air (↑), top-right sticker = pause
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const [x, y] = canvasPoint(t);
+      if (x > W - 110 && y < 150) { pauseGame(); return; }
+      const lane = x < W / 2 ? 0 : 1, key = 'touch' + t.identifier;
+      touchLanes.set(t.identifier, lane); heldKeys[lane].add(key); judgePress(lane);
+    }
+    return;
+  }
+  const wasDemo = state === 'demo'; bump(); touchX = wasDemo ? null : e.touches[0].clientX;
+}, { passive: false });
+canvas.addEventListener('touchcancel', e => { for (const t of e.changedTouches) { const lane = touchLanes.get(t.identifier); if (lane == null) continue; touchLanes.delete(t.identifier); heldKeys[lane].delete('touch' + t.identifier); if (!heldKeys[lane].size) releaseLane(lane); } });
 canvas.addEventListener('touchend', e => {
+  let handled = false;
+  for (const t of e.changedTouches) {
+    const lane = touchLanes.get(t.identifier); if (lane == null) continue;
+    touchLanes.delete(t.identifier); heldKeys[lane].delete('touch' + t.identifier);
+    if (!heldKeys[lane].size) releaseLane(lane); handled = true;
+  }
+  if (handled) return;
   if (touchX == null) return;
   const dx = e.changedTouches[0].clientX - touchX; touchX = null;
   if (state !== 'select' || diffOpen || bossesOpen) return;

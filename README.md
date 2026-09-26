@@ -2,7 +2,7 @@
 
 **Team: CC's music**
 
-**Play it now: https://muso-brown.vercel.app** (desktop Chrome, keyboard)
+**Play it now: https://muso-brown.vercel.app** (desktop Chrome with keyboard, or a phone in landscape)
 
 Muso is a browser rhythm runner that turns *any* song into a level. Drop in an MP3, and a
 signal-processing pipeline listens to the track, finds the beats, and builds a chart in a
@@ -11,8 +11,10 @@ file drawn entirely in code, in a street-sticker / printed-comic style.
 
 ## How to play
 
-- **↓ (or F)** hits ground enemies, **↑ (or J)** hits air enemies. Hold notes are held until the
-  bar ends, mash monsters take repeated presses, ghosts turn invisible mid-flight, so keep the beat.
+- **↓ (or F)** hits ground enemies, **↑ (or J)** hits air enemies. On a phone (landscape), tap the
+  left half of the screen for ↓ and the right half for ↑; the pause sticker sits top-right. Hold
+  notes are held until the bar ends, mash monsters take repeated presses, ghosts turn invisible
+  mid-flight, so keep the beat.
 - **Four difficulties**: Easy, Normal, Hard, Expert. Expert unlocks per song once you have
   finished that song on Hard, and it is the only difficulty where **bosses** appear: two or three
   times per song a boss floats in and summons waves of enemies; clearing at least 80% of a wave
@@ -161,8 +163,9 @@ on screen is about 1.3 ms of JavaScript per frame.
 
 - **iOS / Safari**: audio needs a user gesture (handled), but iOS was not tested in depth and
   large uploads may hit memory limits on older devices.
-- **Mobile**: the layout is fixed at 1280×720 and touch is only used on the song-select
-  carousel; gameplay is keyboard-only for now.
+- **Mobile**: the 1280×720 stage is scaled to fit the window and gameplay has left/right tap
+  zones, but only landscape is laid out (portrait shrinks the stage), and phones were tested in
+  Chrome's device emulation rather than on a wide range of real devices.
 - **Bundled songs on `file://`**: Chrome blocks `fetch` for double-clicked pages, so bundled
   songs load from base64 `.js` bundles instead (about 1.33× the audio size); over http(s) and on
   itch.io they load directly.

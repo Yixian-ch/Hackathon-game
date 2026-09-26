@@ -30,23 +30,12 @@ file drawn entirely in code, in a street-sticker / printed-comic style.
 
 ## Quick start
 
-**Just play**
-
 - Open **https://muso-brown.vercel.app** (or the itch.io page), or
 - double-click `index.html`. The three bundled songs load from `songs/`, and you can upload your
-  own MP3 / WAV / OGG from the "+ UPLOAD YOUR SONG" record. Everything below runs offline.
+  own MP3 / WAV / OGG from the "+ UPLOAD YOUR SONG" record.
 
-**Run song generation (optional)**
-
-```bash
-npm install
-echo "GEMINI_API_KEY=your_key_here" > .env
-node server.js
-# then open http://localhost:3000
-```
-
-Without a key the game is fully playable: bundled songs, uploads, all difficulties, bosses,
-fever, grades and the collection all work. Only the "✦ GENERATE A SONG" record is unavailable.
+No install, no build step, no key: everything runs offline in the browser. The "✦ GENERATE A
+SONG" record is a placeholder (see Architecture).
 
 ## Architecture
 
@@ -56,11 +45,10 @@ fever, grades and the collection all work. Only the "✦ GENERATE A SONG" record
 │  Canvas 2D rendering · Web Audio analysis    │
 │  chart generation · gameplay · localStorage  │
 └───────────────┬──────────────────────────────┘
-                │ optional, only for "Generate a song"
+                │ planned, only for "Generate a song"
                 ▼
 ┌──────────────────────────────────────────────┐
-│  Local proxy: server.js (Node)               │
-│  holds GEMINI_API_KEY from .env              │
+│  Local proxy (Node) holding the API key      │
 └───────────────┬──────────────────────────────┘
                 ▼
 ┌──────────────────────────────────────────────┐
@@ -68,9 +56,11 @@ fever, grades and the collection all work. Only the "✦ GENERATE A SONG" record
 └──────────────────────────────────────────────┘
 ```
 
-The API key lives only on the server side. The page never calls Google directly; it asks the
-local proxy for a generated track, receives audio, and then runs the same analysis pipeline it
-uses for any uploaded file. Playing the game does not require the proxy at all.
+Today the game is the top box only. Song generation is designed as an add-on behind a small
+server-side proxy, so the API key never reaches the page and the browser never calls Google
+directly; the generated audio would then go through the same analysis pipeline as an uploaded
+file. In the current build the GENERATE record calls the `onGenerateSong()` hook, which is a
+stub, so the game never needs a key or a server.
 
 ## Chart generation
 
@@ -118,8 +108,8 @@ All of these live in one `DIFFICULTY` object; the analysis constants live in `AN
 |---|---|
 | Web Audio API | Decoding audio, offline analysis, sample-accurate playback clock (`audioContext.currentTime`) |
 | Canvas 2D | All rendering; every sprite, texture and UI element is drawn in code |
-| Gemini API / Lyria 3.5 | Song generation behind the optional local proxy |
-| Node.js | `server.js`, the proxy that keeps the API key server-side |
+| Gemini API / Lyria 3.5 | Planned: song generation behind a local proxy (not in this build) |
+| Node.js | Planned: the proxy that keeps the API key server-side (not in this build) |
 | localStorage | Best scores per song and difficulty, boss collection, uploaded-song metadata, settings |
 | Vercel | Hosting of the live build (static, no build step): https://muso-brown.vercel.app |
 | itch.io | Distribution of the HTML5 build |
@@ -145,7 +135,6 @@ index.html          the whole game, in four commented blocks:
                     (2) game state, judgment, scoring, fever, bosses
                     (3) rendering: textures built once, sticker art, HUD, results
                     (4) song library, vinyl song-select, input
-server.js           optional Node proxy for song generation (needs GEMINI_API_KEY in .env)
 songs/              bundled songs plus songs/<file>.js base64 bundles for double-click play
 tools/bundle_songs.py  regenerates those bundles after adding or replacing a song
 vercel.json, .vercelignore   static deployment config for Vercel (songs get immutable cache headers)
@@ -169,7 +158,8 @@ on screen is about 1.3 ms of JavaScript per frame.
 - **Bundled songs on `file://`**: Chrome blocks `fetch` for double-clicked pages, so bundled
   songs load from base64 `.js` bundles instead (about 1.33× the audio size); over http(s) and on
   itch.io they load directly.
-- **Song generation** is wired as a hook (`onGenerateSong()`); it depends on the proxy and a key.
+- **Song generation** is not implemented: the GENERATE record shows COMING SOON and calls the
+  `onGenerateSong()` hook.
 - **Chart quality** is best on music with clear drums. Ambient or heavily swung material can get
   a half-tempo estimate or sparse charts; a tempo override is on the list.
 - Not built yet: a chart editor, sharing charts and scores with other players, more boss types,
